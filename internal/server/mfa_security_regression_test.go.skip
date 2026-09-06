@@ -1,0 +1,513 @@
+package server
+
+import (
+	"bytes"
+	"crypto/rand"
+	"database/sql"
+	"encoding/json"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/pquerna/otp/totp"
+	"github.com/schlunsen/wee-editor/internal/database"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestMFASetupVerification_RejectsInvalidCodes is a regression test for the bug where
+// any 6-digit code was accepted during MFA setup verification.
+//
+// BUG: Lines 180-183 in mfa_handlers.go (before fix) accepted any valid format without
+// actually verifying the TOTP code against the secret.
+//
+// This test ensures that:
+// 1. Only the actual TOTP code from the secret works
+// 2. Common bypass codes like 000000, 123456 are rejected
+// 3. Random 6-digit codes are rejected
+func TestMFASetupVerification_RejectsInvalidCodes(t *testing.T) {
+	db := NewTestDB(t)
+	defer db.Close()
+
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	require.NoError(t, err)
+
+	mfaManager, err := NewMFAManager(key)
+	require.NoError(t, err)
+
+	testUser := CreateTestUser(t, db, "testuser", "password123", false)
+	userStore := NewInMemoryUserStore()
+	userStore.users["testuser"] = testUser
+
+	server := &Server{
+		db:         db,
+		mfaManager: mfaManager,
+		userStore:  userStore,
+	}
+
+	// Step 1: Start MFA setup to get a TOTP secret
+	app := fiber.New()
+	app.Post("/api/auth/mfa/setup", func(c *fiber.Ctx) error {
+		c.Locals("user", testUser)
+		return server.handleMFASetupStart(c)
+	})
+	app.Post("/api/auth/mfa/setup/verify", func(c *fiber.Ctx) error {
+		c.Locals("user", testUser)
+		return server.handleMFASetupVerify(c)
+	})
+
+	setupReq := httptest.NewRequest("POST", "/api/auth/mfa/setup", nil)
+	setupResp, err := app.Test(setupReq, 5000) // 5 second timeout for bcrypt operations
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, setupResp.StatusCode)
+
+	var setupResponse database.TOTPSetupResponse
+	err = json.NewDecoder(setupResp.Body).Decode(&setupResponse)
+	require.NoError(t, err)
+
+	// Step 2: Try common bypass codes - ALL SHOULD FAIL
+	bypassCodes := []string{
+		"000000", // All zeros
+		"123456", // Sequential
+		"111111", // All ones
+		"999999", // All nines
+		"654321", // Reverse sequential
+		"555555", // Repeated digit
+	}
+
+	for _, invalidCode := range bypassCodes {
+		t.Run("Rejects "+invalidCode, func(t *testing.T) {
+			reqBody := database.MFASetupVerifyRequest{
+				TemporaryToken: setupResponse.TemporaryToken,
+				Code:           invalidCode,
+			}
+			bodyBytes, _ := json.Marshal(reqBody)
+
+			req := httptest.NewRequest("POST", "/api/auth/mfa/setup/verify", bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req, 5000) // 5 second timeout for bcrypt operations
+			require.NoError(t, err)
+
+			// CRITICAL: Invalid codes MUST be rejected with 400 Bad Request
+			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode,
+				"Invalid code %s should be rejected, but was accepted!", invalidCode)
+
+			var errResp map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.Contains(t, errResp["error"], "Invalid verification code",
+				"Error message should indicate invalid code")
+		})
+	}
+
+	// Step 3: Generate the actual valid TOTP code and verify it works
+	t.Run("Accepts valid TOTP code", func(t *testing.T) {
+		// Generate the correct TOTP code from the secret
+		validCode, err := totp.GenerateCode(setupResponse.Secret, time.Now())
+		require.NoError(t, err)
+
+		reqBody := database.MFASetupVerifyRequest{
+			TemporaryToken: setupResponse.TemporaryToken,
+			Code:           validCode,
+		}
+		bodyBytes, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest("POST", "/api/auth/mfa/setup/verify", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req, 5000) // 5 second timeout for bcrypt operations
+		require.NoError(t, err)
+
+		// Valid code MUST be accepted with 200 OK
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode,
+			"Valid TOTP code should be accepted")
+
+		var successResp map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&successResp)
+		assert.Equal(t, "enabled", successResp["status"])
+	})
+}
+
+// TestMFALoginVerification_RejectsInvalidCodes is a regression test for the bug where
+// any 6-digit code was accepted during MFA login verification.
+//
+// BUG: Lines 377-381 in mfa_handlers.go (before fix) accepted any valid format without
+// decrypting and verifying the TOTP secret from the MFA config.
+//
+// This test ensures that:
+// 1. Login requires the actual TOTP code from the encrypted secret
+// 2. Invalid codes are rejected
+// 3. The stored encrypted secret is properly decrypted and verified
+func TestMFALoginVerification_RejectsInvalidCodes(t *testing.T) {
+	db := NewTestDB(t)
+	defer db.Close()
+
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	require.NoError(t, err)
+
+	mfaManager, err := NewMFAManager(key)
+	require.NoError(t, err)
+
+	_ = CreateTestUser(t, db, "testuser", "password123", false)
+	userStore := NewInMemoryUserStore()
+	userStore.SetDatabase(db) // Attach database to avoid file write errors
+	err = userStore.Initialize()
+	require.NoError(t, err)
+
+	server := &Server{
+		db:         db,
+		mfaManager: mfaManager,
+		userStore:  userStore,
+	}
+
+	// Setup: Enable MFA for the user with a known secret
+	repo := database.NewRepository(db)
+	totpKey, err := mfaManager.GenerateTOTPSecret("testuser", "CCT")
+	require.NoError(t, err)
+
+	// Encrypt the TOTP secret for storage
+	encryptedSecret, iv, err := mfaManager.EncryptSecret(totpKey.Secret())
+	require.NoError(t, err)
+
+	// Generate backup codes
+	plainCodes, _ := mfaManager.GenerateBackupCodes(10)
+	collection, _ := mfaManager.NewBackupCodeCollection(plainCodes)
+	backupCodesJSON, _ := mfaManager.SerializeBackupCodes(collection)
+
+	mfaConfig := &database.MFAConfig{
+		Username:  "testuser",
+		IsEnabled: true,
+		TOTPSecret: sql.NullString{
+			String: encryptedSecret,
+			Valid:  true,
+		},
+		TOTPSecretIV: sql.NullString{
+			String: iv,
+			Valid:  true,
+		},
+		BackupCodes: sql.NullString{
+			String: backupCodesJSON,
+			Valid:  true,
+		},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	err = repo.SaveMFAConfig(mfaConfig)
+	require.NoError(t, err)
+
+	// Create a login temporary token
+	tempToken := &database.MFATemporaryToken{
+		Token:       GenerateTemporaryToken(),
+		Username:    "testuser",
+		TokenType:   "login",
+		Verified:    false,
+		Attempts:    0,
+		MaxAttempts: 5,
+		CreatedAt:   time.Now(),
+		ExpiresAt:   CalculateTokenExpiration(300),
+		IPAddress:   "127.0.0.1",
+		UserAgent:   "test-agent",
+	}
+	err = repo.SaveMFATemporaryToken(tempToken)
+	require.NoError(t, err)
+
+	app := fiber.New()
+	app.Post("/api/auth/mfa/verify", server.handleMFAVerify)
+
+	// Test 1: Try common bypass codes - ALL SHOULD FAIL
+	bypassCodes := []string{
+		"000000",
+		"123456",
+		"111111",
+		"999999",
+		"654321",
+	}
+
+	for _, invalidCode := range bypassCodes {
+		t.Run("Login rejects "+invalidCode, func(t *testing.T) {
+			reqBody := map[string]string{
+				"temporary_token": tempToken.Token,
+				"code":            invalidCode,
+			}
+			bodyBytes, _ := json.Marshal(reqBody)
+
+			req := httptest.NewRequest("POST", "/api/auth/mfa/verify", bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req, 5000) // 5 second timeout
+			require.NoError(t, err)
+
+			// CRITICAL: Invalid codes MUST be rejected
+			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode,
+				"Login with invalid code %s should be rejected, but was accepted!", invalidCode)
+
+			var errResp map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.Contains(t, errResp["error"], "Invalid verification code",
+				"Error message should indicate invalid code")
+		})
+	}
+
+	// Test 2: Try the actual valid TOTP code - SHOULD SUCCEED
+	t.Run("Login accepts valid TOTP code", func(t *testing.T) {
+		// Create a fresh temporary token (previous one is rate-limited after 5 failed attempts)
+		freshToken := &database.MFATemporaryToken{
+			Token:       GenerateTemporaryToken(),
+			Username:    "testuser",
+			TokenType:   "login",
+			Verified:    false,
+			Attempts:    0,
+			MaxAttempts: 5,
+			CreatedAt:   time.Now(),
+			ExpiresAt:   CalculateTokenExpiration(300),
+			IPAddress:   "127.0.0.1",
+			UserAgent:   "test-agent",
+		}
+		err := repo.SaveMFATemporaryToken(freshToken)
+		require.NoError(t, err)
+
+		// Generate the correct code from the secret
+		validCode, err := totp.GenerateCode(totpKey.Secret(), time.Now())
+		require.NoError(t, err)
+
+		reqBody := map[string]string{
+			"temporary_token": freshToken.Token,
+			"code":            validCode,
+		}
+		bodyBytes, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest("POST", "/api/auth/mfa/verify", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req, 5000) // 5 second timeout
+		require.NoError(t, err)
+
+		// Valid code MUST grant access
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode,
+			"Login with valid TOTP code should succeed")
+
+		var successResp map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&successResp)
+		assert.Equal(t, "verified", successResp["status"])
+		assert.NotEmpty(t, successResp["token"], "Should receive session token")
+	})
+}
+
+// TestMFACodeTimeSensitivity tests that TOTP codes are time-sensitive
+func TestMFACodeTimeSensitivity(t *testing.T) {
+	db := NewTestDB(t)
+	defer db.Close()
+
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	require.NoError(t, err)
+
+	mfaManager, err := NewMFAManager(key)
+	require.NoError(t, err)
+
+	// Generate a TOTP secret
+	totpKey, err := mfaManager.GenerateTOTPSecret("testuser", "CCT")
+	require.NoError(t, err)
+
+	// Test codes from different time periods
+	t.Run("Code from 2 minutes ago is rejected", func(t *testing.T) {
+		// Generate code for 2 minutes ago (4 time steps = 120 seconds)
+		pastTime := time.Now().Add(-2 * time.Minute)
+		oldCode, err := totp.GenerateCode(totpKey.Secret(), pastTime)
+		require.NoError(t, err)
+
+		// This code should be rejected (outside ±1 time step window)
+		valid, err := mfaManager.VerifyTOTPCode(totpKey.Secret(), oldCode)
+		require.NoError(t, err)
+		assert.False(t, valid, "Code from 2 minutes ago should be invalid")
+	})
+
+	t.Run("Code from current time is accepted", func(t *testing.T) {
+		currentCode, err := totp.GenerateCode(totpKey.Secret(), time.Now())
+		require.NoError(t, err)
+
+		valid, err := mfaManager.VerifyTOTPCode(totpKey.Secret(), currentCode)
+		require.NoError(t, err)
+		assert.True(t, valid, "Current code should be valid")
+	})
+
+	t.Run("Code from 30 seconds ago is accepted (within skew)", func(t *testing.T) {
+		// This tests the ±1 time step window
+		pastTime := time.Now().Add(-30 * time.Second)
+		recentCode, err := totp.GenerateCode(totpKey.Secret(), pastTime)
+		require.NoError(t, err)
+
+		valid, err := mfaManager.VerifyTOTPCode(totpKey.Secret(), recentCode)
+		require.NoError(t, err)
+		assert.True(t, valid, "Code from 30 seconds ago should be valid (within ±1 skew)")
+	})
+}
+
+// TestMFAVerification_AuditLogging tests that failed verification attempts are logged
+func TestMFAVerification_AuditLogging(t *testing.T) {
+	db := NewTestDB(t)
+	defer db.Close()
+
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	require.NoError(t, err)
+
+	mfaManager, err := NewMFAManager(key)
+	require.NoError(t, err)
+
+	testUser := CreateTestUser(t, db, "testuser", "password123", false)
+	userStore := NewInMemoryUserStore()
+	userStore.users["testuser"] = testUser
+
+	server := &Server{
+		db:         db,
+		mfaManager: mfaManager,
+		userStore:  userStore,
+	}
+
+	// Start MFA setup
+	app := fiber.New()
+	app.Post("/api/auth/mfa/setup", func(c *fiber.Ctx) error {
+		c.Locals("user", testUser)
+		return server.handleMFASetupStart(c)
+	})
+	app.Post("/api/auth/mfa/setup/verify", func(c *fiber.Ctx) error {
+		c.Locals("user", testUser)
+		return server.handleMFASetupVerify(c)
+	})
+
+	setupReq := httptest.NewRequest("POST", "/api/auth/mfa/setup", nil)
+	setupResp, err := app.Test(setupReq)
+	require.NoError(t, err)
+
+	var setupResponse database.TOTPSetupResponse
+	json.NewDecoder(setupResp.Body).Decode(&setupResponse)
+
+	// Try an invalid code
+	reqBody := database.MFASetupVerifyRequest{
+		TemporaryToken: setupResponse.TemporaryToken,
+		Code:           "000000", // Invalid
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/api/auth/mfa/setup/verify", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	_, err = app.Test(req, 5000) // 5 second timeout
+	require.NoError(t, err)
+
+	// Check audit log
+	repo := database.NewRepository(db)
+	logs, err := repo.GetMFAAuditLog("testuser", 10, 0)
+	require.NoError(t, err)
+
+	// Should have at least 2 entries: setup_started and setup_failed
+	assert.GreaterOrEqual(t, len(logs), 2, "Should have audit log entries")
+
+	// Find the failed verification log
+	var foundFailure bool
+	for _, log := range logs {
+		if log.Action == "setup_failed" && log.Success == false {
+			foundFailure = true
+			assert.Equal(t, "Invalid TOTP code", log.Reason)
+			break
+		}
+	}
+	assert.True(t, foundFailure, "Failed verification should be logged in audit trail")
+}
+
+// TestMFABypassAttempts_RateLimiting tests that repeated invalid attempts trigger rate limiting
+func TestMFABypassAttempts_RateLimiting(t *testing.T) {
+	db := NewTestDB(t)
+	defer db.Close()
+
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	require.NoError(t, err)
+
+	mfaManager, err := NewMFAManager(key)
+	require.NoError(t, err)
+
+	_ = CreateTestUser(t, db, "testuser", "password123", false)
+	userStore := NewInMemoryUserStore()
+	userStore.SetDatabase(db) // Attach database to avoid file write errors
+	err = userStore.Initialize()
+	require.NoError(t, err)
+
+	server := &Server{
+		db:         db,
+		mfaManager: mfaManager,
+		userStore:  userStore,
+	}
+
+	repo := database.NewRepository(db)
+
+	// Setup MFA config
+	totpKey, _ := mfaManager.GenerateTOTPSecret("testuser", "CCT")
+	encryptedSecret, iv, _ := mfaManager.EncryptSecret(totpKey.Secret())
+	plainCodes, _ := mfaManager.GenerateBackupCodes(10)
+	collection, _ := mfaManager.NewBackupCodeCollection(plainCodes)
+	backupCodesJSON, _ := mfaManager.SerializeBackupCodes(collection)
+
+	mfaConfig := &database.MFAConfig{
+		Username:  "testuser",
+		IsEnabled: true,
+		TOTPSecret: sql.NullString{
+			String: encryptedSecret,
+			Valid:  true,
+		},
+		TOTPSecretIV: sql.NullString{
+			String: iv,
+			Valid:  true,
+		},
+		BackupCodes: sql.NullString{
+			String: backupCodesJSON,
+			Valid:  true,
+		},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	_ = repo.SaveMFAConfig(mfaConfig)
+
+	// Create token with max attempts already reached
+	tempToken := &database.MFATemporaryToken{
+		Token:       GenerateTemporaryToken(),
+		Username:    "testuser",
+		TokenType:   "login",
+		Verified:    false,
+		Attempts:    5, // At max attempts
+		MaxAttempts: 5,
+		CreatedAt:   time.Now(),
+		ExpiresAt:   CalculateTokenExpiration(300),
+		IPAddress:   "127.0.0.1",
+		UserAgent:   "test-agent",
+	}
+	_ = repo.SaveMFATemporaryToken(tempToken)
+
+	app := fiber.New()
+	app.Post("/api/auth/mfa/verify", server.handleMFAVerify)
+
+	// Try to verify - should be rate limited
+	reqBody := map[string]string{
+		"temporary_token": tempToken.Token,
+		"code":            "123456",
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/api/auth/mfa/verify", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req, 5000) // 5 second timeout
+	require.NoError(t, err)
+
+	// Should be rate limited
+	assert.Equal(t, fiber.StatusTooManyRequests, resp.StatusCode,
+		"Too many attempts should trigger rate limiting")
+
+	var errResp map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Contains(t, errResp["error"], "Too many", "Error should mention rate limiting")
+}

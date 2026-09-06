@@ -1,0 +1,93 @@
+/* Nord Dark Theme - Arctic-inspired palette */
+[data-theme="nord-dark"] {
+  --bg-primary: #2e3440;
+  --bg-secondary: #3b4252;
+  --bg-tertiary: #434c5e;
+  --text-primary: #eceff4;
+  --text-secondary: #d8dee9;
+  --text-muted: #4c566a;
+  --accent-purple: #b48ead;
+  --accent-cyan: #88c0d0;
+  --accent-green: #a3be8c;
+  --accent-yellow: #ebcb8b;
+  --accent-orange: #d08770;
+  --border-color: #4c566a;
+  --code-bg: #3b4252;
+  --card-bg: #434c5e;
+  --card-hover: #4c566a;
+  --status-success: #a3be8c;
+  --status-warning: #ebcb8b;
+  --status-error: #bf616a;
+
+  /* Context Progress Bar Colors */
+  --progress-start: #88c0d0;      /* Cyan - 0-25% */
+  --progress-low: #b48ead;        /* Purple - 25-50% */
+  --progress-medium: #ebcb8b;     /* Yellow - 50-75% */
+  --progress-high: #bf616a;       /* Red - 75-100% */
+
+  /* Theme-aware overlay colors */
+  --overlay-text: rgba(236, 239, 244, 0.6);
+  --overlay-text-hover: rgba(236, 239, 244, 0.8);
+  --overlay-text-active: #eceff4;
+  --overlay-bg: rgba(236, 239, 244, 0.05);
+  --overlay-bg-hover: rgba(236, 239, 244, 0.08);
+  --overlay-bg-active: rgba(236, 239, 244, 0.1);
+  --overlay-border: rgba(236, 239, 244, 0.1);
+  --overlay-border-hover: rgba(236, 239, 244, 0.2);
+  --overlay-divider: rgba(236, 239, 244, 0.15);
+  --header-bg: rgba(0, 0, 0, 0.15);
+  --header-border: rgba(236, 239, 244, 0.1);
+  --badge-bg: rgba(236, 239, 244, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* Typography - Developer-focused font */
+  --font-primary: 'Fira Code', 'Fira Sans', monospace;
+  --font-mono: 'Fira Code', 'SF Mono', monospace;
+}
+
+/* Nord Light Theme - Bright Nordic palette */
+[data-theme="nord-light"] {
+  --bg-primary: #eceff4;
+  --bg-secondary: #e5e9f0;
+  --bg-tertiary: #ffffff;
+  --text-primary: #2e3440;
+  --text-secondary: #3b4252;
+  --text-muted: #4c566a;
+  --accent-purple: #b48ead;
+  --accent-cyan: #5e81ac;
+  --accent-green: #8fbcbb;
+  --accent-yellow: #ebcb8b;
+  --accent-orange: #d08770;
+  --border-color: #d8dee9;
+  --code-bg: #e5e9f0;
+  --card-bg: #ffffff;
+  --card-hover: #f9fafb;
+  --status-success: #a3be8c;
+  --status-warning: #ebcb8b;
+  --status-error: #bf616a;
+
+  /* Context Progress Bar Colors */
+  --progress-start: #5e81ac;      /* Cyan - 0-25% */
+  --progress-low: #b48ead;        /* Purple - 25-50% */
+  --progress-medium: #ebcb8b;     /* Yellow - 50-75% */
+  --progress-high: #bf616a;       /* Red - 75-100% */
+
+  /* Theme-aware overlay colors (light) */
+  --overlay-text: rgba(46, 52, 64, 0.55);
+  --overlay-text-hover: rgba(46, 52, 64, 0.7);
+  --overlay-text-active: #2e3440;
+  --overlay-bg: rgba(46, 52, 64, 0.04);
+  --overlay-bg-hover: rgba(46, 52, 64, 0.06);
+  --overlay-bg-active: rgba(46, 52, 64, 0.08);
+  --overlay-border: rgba(46, 52, 64, 0.1);
+  --overlay-border-hover: rgba(46, 52, 64, 0.2);
+  --overlay-divider: rgba(46, 52, 64, 0.12);
+  --header-bg: rgba(46, 52, 64, 0.03);
+  --header-border: rgba(46, 52, 64, 0.1);
+  --badge-bg: rgba(46, 52, 64, 0.08);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+
+  /* Typography - Developer-focused font */
+  --font-primary: 'Fira Code', 'Fira Sans', monospace;
+  --font-mono: 'Fira Code', 'SF Mono', monospace;
+}

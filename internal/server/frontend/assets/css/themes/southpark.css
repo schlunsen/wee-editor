@@ -1,0 +1,93 @@
+/* South Park Dark Theme - Screw you guys, I'm going home! */
+[data-theme="southpark-dark"] {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --text-primary: #e8e8e8;
+  --text-secondary: #b8b8b8;
+  --text-muted: #888888;
+  --accent-purple: #ff6b9d;
+  --accent-cyan: #00d9ff;
+  --accent-green: #39ff14;
+  --accent-yellow: #ffcc00;
+  --accent-orange: #ff6600;
+  --border-color: #0f3460;
+  --code-bg: #16213e;
+  --card-bg: #0f3460;
+  --card-hover: #1a4d7a;
+  --status-success: #39ff14;
+  --status-warning: #ffcc00;
+  --status-error: #ff0044;
+
+  /* Context Progress Bar Colors */
+  --progress-start: #00d9ff;      /* Cyan - 0-25% */
+  --progress-low: #ff6b9d;        /* Purple - 25-50% */
+  --progress-medium: #ffcc00;     /* Yellow - 50-75% */
+  --progress-high: #ff0044;       /* Red - 75-100% */
+
+  /* Theme-aware overlay colors */
+  --overlay-text: rgba(232, 232, 232, 0.6);
+  --overlay-text-hover: rgba(232, 232, 232, 0.8);
+  --overlay-text-active: #e8e8e8;
+  --overlay-bg: rgba(232, 232, 232, 0.05);
+  --overlay-bg-hover: rgba(232, 232, 232, 0.08);
+  --overlay-bg-active: rgba(232, 232, 232, 0.1);
+  --overlay-border: rgba(232, 232, 232, 0.1);
+  --overlay-border-hover: rgba(232, 232, 232, 0.2);
+  --overlay-divider: rgba(232, 232, 232, 0.15);
+  --header-bg: rgba(0, 0, 0, 0.2);
+  --header-border: rgba(232, 232, 232, 0.1);
+  --badge-bg: rgba(232, 232, 232, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* Typography - Comic-style bold font */
+  --font-primary: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive;
+  --font-mono: 'Comic Sans MS', 'Courier New', monospace;
+}
+
+/* South Park Light Theme - Oh my God, they coded Kenny! */
+[data-theme="southpark-light"] {
+  --bg-primary: #e8f4f8;
+  --bg-secondary: #d0e8f2;
+  --bg-tertiary: #ffffff;
+  --text-primary: #1a1a2e;
+  --text-secondary: #16213e;
+  --text-muted: #0f3460;
+  --accent-purple: #e91e63;
+  --accent-cyan: #00bcd4;
+  --accent-green: #4caf50;
+  --accent-yellow: #ffc107;
+  --accent-orange: #ff5722;
+  --border-color: #b3d9e8;
+  --code-bg: #d0e8f2;
+  --card-bg: #ffffff;
+  --card-hover: #e0f0f8;
+  --status-success: #4caf50;
+  --status-warning: #ffc107;
+  --status-error: #f44336;
+
+  /* Context Progress Bar Colors */
+  --progress-start: #00bcd4;      /* Cyan - 0-25% */
+  --progress-low: #e91e63;        /* Purple - 25-50% */
+  --progress-medium: #ffc107;     /* Yellow - 50-75% */
+  --progress-high: #f44336;       /* Red - 75-100% */
+
+  /* Theme-aware overlay colors (light) */
+  --overlay-text: rgba(26, 26, 46, 0.55);
+  --overlay-text-hover: rgba(26, 26, 46, 0.7);
+  --overlay-text-active: #1a1a2e;
+  --overlay-bg: rgba(26, 26, 46, 0.04);
+  --overlay-bg-hover: rgba(26, 26, 46, 0.06);
+  --overlay-bg-active: rgba(26, 26, 46, 0.08);
+  --overlay-border: rgba(26, 26, 46, 0.1);
+  --overlay-border-hover: rgba(26, 26, 46, 0.2);
+  --overlay-divider: rgba(26, 26, 46, 0.12);
+  --header-bg: rgba(26, 26, 46, 0.03);
+  --header-border: rgba(26, 26, 46, 0.1);
+  --badge-bg: rgba(26, 26, 46, 0.08);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+
+  /* Typography - Comic-style bold font */
+  --font-primary: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive;
+  --font-mono: 'Comic Sans MS', 'Courier New', monospace;
+}

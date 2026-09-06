@@ -1,0 +1,177 @@
+/**
+ * Message and time formatting utilities for agent conversations
+ */
+
+/**
+ * Escape HTML entities to prevent XSS
+ * @param text - Raw text to escape
+ * @returns HTML-safe string
+ */
+export const escapeHtml = (text: string): string => {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Format a timestamp to a readable time string
+ * @param timestamp - Date timestamp
+ * @returns Formatted time string (e.g., "2:30 PM")
+ */
+export const formatTime = (timestamp: string | number | Date): string => {
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
+}
+
+/**
+ * Format a timestamp as relative time
+ * @param timestamp - Date timestamp
+ * @returns Relative time string (e.g., "5m ago", "2h ago")
+ */
+export const formatRelativeTime = (timestamp: string | number | Date): string => {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
+}
+
+/**
+ * Format message content for display with markdown support
+ * @param content - Raw message content
+ * @returns HTML-formatted message string
+ */
+export const formatMessage = (content: any): string => {
+  // Handle array of content blocks (structured format)
+  if (Array.isArray(content)) {
+    // Check if this is a tool_result array - these should not be displayed
+    const hasToolResult = content.some((block: any) => block && block.type === 'tool_result')
+    if (hasToolResult) {
+      return '<em class="system-message">Tool execution complete</em>'
+    }
+
+    // Extract text blocks
+    const textBlocks = content
+      .filter((block: any) => block && block.type === 'text' && block.text)
+      .map((block: any) => block.text)
+
+    if (textBlocks.length > 0) {
+      content = textBlocks.join('\n\n')
+    } else {
+      return '<em class="system-message">Processing...</em>'
+    }
+  }
+
+  // If content is an object, extract text from it first
+  if (typeof content === 'object' && content !== null) {
+    // Check if this is a single tool_result block - these should not be displayed
+    if (content.type === 'tool_result') {
+      return '<em class="system-message">Tool execution complete</em>'
+    }
+
+    // Try to extract meaningful text from the object
+    if (content.text) {
+      content = Array.isArray(content.text) ? content.text.join('\n') : String(content.text)
+    } else if (content.content) {
+      content = String(content.content)
+    } else {
+      // For other objects, create a concise representation
+      const objType = escapeHtml(String(content.type || 'unknown'))
+      const keys = Object.keys(content).filter(k => k !== 'type')
+      if (keys.length === 0) {
+        return `<em class="system-message">${objType}</em>`
+      }
+      // Show key properties in a readable format
+      const props = keys.slice(0, 3).map(k => `${escapeHtml(k)}: ${escapeHtml(String(content[k]).substring(0, 30))}`).join(', ')
+      return `<em class="system-message">${objType} - ${props}</em>`
+    }
+  }
+
+  // Ensure content is a string at this point
+  content = String(content)
+
+  // Check if content is stringified JSON with tool_result
+  if (content.trim().startsWith('[') || content.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(content)
+      if (Array.isArray(parsed) && parsed.some((block: any) => block.type === 'tool_result')) {
+        return '<em class="system-message">Tool execution complete</em>'
+      }
+      if (parsed.type === 'tool_result') {
+        return '<em class="system-message">Tool execution complete</em>'
+      }
+    } catch (e) {
+      // Not valid JSON, continue with normal processing
+    }
+  }
+
+  // Skip system messages and JSON-like content
+  if (content.includes('SystemMessage(') || (content.startsWith('{') && content.includes('"type"'))) {
+    return '<em class="system-message">Processing...</em>'
+  }
+
+  // Clean up the content
+  let cleanContent = content
+
+  // If it's a string representation of an object, try to extract meaningful text
+  if (cleanContent.includes('assistant:')) {
+    const match = cleanContent.match(/assistant:\s*(.+?)(?:\n|$)/i)
+    if (match) {
+      cleanContent = match[1]
+    }
+  }
+
+  // Escape HTML entities before applying markdown formatting to prevent XSS
+  cleanContent = escapeHtml(cleanContent)
+
+  // Convert markdown to HTML (basic)
+  let formatted = cleanContent
+    .replace(/```(.*?)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+
+  // Convert URLs to clickable links (must be done before newline conversion)
+  // Match URLs but exclude those already in HTML tags (code blocks, etc.)
+  const urlRegex = /(?<!<[^>]*)(https?:\/\/[^\s<]+[^\s<.,;:!?)])/gi
+  formatted = formatted.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" class="message-link">$1</a>')
+
+  // Convert newlines to <br> last
+  return formatted.replace(/\n/g, '<br>')
+}
+
+/**
+ * Truncate a path or text to a maximum length
+ * @param text - Text to truncate
+ * @param maxLength - Maximum length
+ * @returns Truncated text with ellipsis if needed
+ */
+export const truncatePath = (text: string | undefined | null, maxLength: number): string => {
+  if (!text) return ''
+  if (text.length <= maxLength) return text
+
+  // For paths, try to keep the filename
+  if (text.includes('/')) {
+    const parts = text.split('/')
+    const filename = parts[parts.length - 1]
+    if (filename.length < maxLength - 3) {
+      return `.../${filename}`
+    }
+  }
+
+  return text.substring(0, maxLength - 3) + '...'
+}

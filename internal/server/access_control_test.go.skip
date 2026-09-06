@@ -1,0 +1,406 @@
+package server
+
+import (
+	"os"
+	"testing"
+	"time"
+
+	"github.com/schlunsen/wee-editor/internal/database"
+)
+
+// newTestDatabase creates a test database for OAuth state manager tests
+func newTestDatabase(t *testing.T) *database.Database {
+	// Reset singleton instance to avoid conflicts
+	database.ResetInstance()
+
+	tempDir, err := os.MkdirTemp("", "oauth_test_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		os.RemoveAll(tempDir)
+		database.ResetInstance()
+	})
+
+	db, err := database.Initialize(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to initialize test database: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	return db
+}
+
+// TestAccessValidatorDomainPatternMatching tests domain pattern matching
+func TestAccessValidatorDomainPatternMatching(t *testing.T) {
+	config := &AccessControlConfig{
+		Enabled:        true,
+		AllowedDomains: []string{"*@example.com", "*@company.co.uk", "admin@special.org"},
+	}
+
+	validator := NewAccessValidator(config, nil)
+
+	tests := []struct {
+		name     string
+		email    string
+		pattern  string
+		expected bool
+	}{
+		// Exact domain matches
+		{"exact domain match", "user@example.com", "*@example.com", true},
+		{"exact domain match case insensitive", "User@EXAMPLE.COM", "*@example.com", true},
+		{"different domain", "user@other.com", "*@example.com", false},
+
+		// Subdomain matching
+		{"subdomain match", "user@dept.example.com", "*@example.com", true},
+		{"deep subdomain match", "user@team.dept.example.com", "*@example.com", true},
+		{"subdomain mismatch", "user@examplecom.net", "*@example.com", false},
+
+		// Multiple level domains
+		{"multi-level domain match", "user@example.co.uk", "*@company.co.uk", false},
+		{"multi-level exact match", "user@company.co.uk", "*@company.co.uk", true},
+
+		// Exact email matches
+		{"exact email match", "admin@special.org", "admin@special.org", true},
+		{"exact email case insensitive", "ADMIN@SPECIAL.ORG", "admin@special.org", true},
+		{"different exact email", "user@special.org", "admin@special.org", false},
+
+		// Invalid emails
+		{"no domain", "useronly", "*@example.com", false},
+		{"multiple @", "user@test@example.com", "*@example.com", false},
+		{"empty email", "", "*@example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := validator.matchesDomainPattern(tt.email, tt.pattern)
+			if result != tt.expected {
+				t.Errorf("matchesDomainPattern(%q, %q) = %v, expected %v", tt.email, tt.pattern, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestAccessValidatorValidateUser tests user validation
+func TestAccessValidatorValidateUser(t *testing.T) {
+	config := &AccessControlConfig{
+		Enabled:        true,
+		AllowedUsers:   []string{"admin", "user@example.com"},
+		AllowedDomains: []string{"*@company.com"},
+		DenyMessage:    "Custom deny message",
+	}
+
+	validator := NewAccessValidator(config, nil)
+
+	tests := []struct {
+		name      string
+		username  string
+		email     string
+		allowed   bool
+		wantError bool
+	}{
+		// Allowed users
+		{"exact username match", "admin", "admin@example.com", true, false},
+		{"email in allowed users", "user", "user@example.com", true, false},
+
+		// Allowed domains
+		{"domain allowed", "john", "john@company.com", true, false},
+		{"subdomain allowed", "jane", "dept.jane@company.com", true, false},
+
+		// Denied users
+		{"username not allowed", "other", "other@unknown.com", false, true},
+		{"email not in whitelist", "user", "user@notallowed.com", false, true},
+		{"empty email and username", "", "", false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.ValidateUser(tt.username, tt.email)
+			if tt.wantError && err == nil {
+				t.Errorf("ValidateUser(%q, %q) expected error, got nil", tt.username, tt.email)
+			}
+			if !tt.wantError && err != nil {
+				t.Errorf("ValidateUser(%q, %q) unexpected error: %v", tt.username, tt.email, err)
+			}
+		})
+	}
+}
+
+// TestAccessValidatorValidateOAuthEmail tests OAuth email validation
+func TestAccessValidatorValidateOAuthEmail(t *testing.T) {
+	config := &AccessControlConfig{
+		Enabled:        true,
+		AllowedUsers:   []string{"john@example.com"},
+		AllowedDomains: []string{"*@company.com"},
+	}
+
+	validator := NewAccessValidator(config, nil)
+
+	tests := []struct {
+		name      string
+		email     string
+		wantError bool
+	}{
+		{"email in allowed list", "john@example.com", false},
+		{"domain in allowed list", "user@company.com", false},
+		{"domain not in list", "user@unknown.com", true},
+		{"empty email", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.ValidateOAuthEmail(tt.email)
+			if tt.wantError && err == nil {
+				t.Errorf("ValidateOAuthEmail(%q) expected error, got nil", tt.email)
+			}
+			if !tt.wantError && err != nil {
+				t.Errorf("ValidateOAuthEmail(%q) unexpected error: %v", tt.email, err)
+			}
+		})
+	}
+}
+
+// TestAccessValidatorDisabledConfig tests validation when access control is disabled
+func TestAccessValidatorDisabledConfig(t *testing.T) {
+	config := &AccessControlConfig{
+		Enabled: false,
+	}
+
+	validator := NewAccessValidator(config, nil)
+
+	// When disabled, all users should be allowed
+	err := validator.ValidateUser("anyone", "anyone@unknown.com")
+	if err != nil {
+		t.Errorf("ValidateUser with disabled config should allow all users, got error: %v", err)
+	}
+
+	err = validator.ValidateOAuthEmail("anything@unknown.com")
+	if err != nil {
+		t.Errorf("ValidateOAuthEmail with disabled config should allow all emails, got error: %v", err)
+	}
+}
+
+// TestAccessValidatorNilConfig tests validation with nil config
+func TestAccessValidatorNilConfig(t *testing.T) {
+	validator := NewAccessValidator(nil, nil)
+
+	// With nil config, all users should be allowed
+	err := validator.ValidateUser("anyone", "anyone@unknown.com")
+	if err != nil {
+		t.Errorf("ValidateUser with nil config should allow all users, got error: %v", err)
+	}
+
+	err = validator.ValidateOAuthEmail("anything@unknown.com")
+	if err != nil {
+		t.Errorf("ValidateOAuthEmail with nil config should allow all emails, got error: %v", err)
+	}
+}
+
+// TestAccessValidatorIsAdmin tests admin detection
+func TestAccessValidatorIsAdmin(t *testing.T) {
+	adminUsers := []string{"admin", "root@example.com", "superadmin@company.com"}
+	validator := NewAccessValidator(nil, nil)
+
+	tests := []struct {
+		name     string
+		username string
+		email    string
+		expected bool
+	}{
+		{"username exact match", "admin", "user@example.com", true},
+		{"email exact match", "user", "root@example.com", true},
+		{"case insensitive", "ADMIN", "user@example.com", true},
+		{"not admin", "user", "user@example.com", false},
+		{"partial match should not match", "adm", "user@example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := validator.IsAdmin(tt.username, tt.email, adminUsers)
+			if result != tt.expected {
+				t.Errorf("IsAdmin(%q, %q) = %v, expected %v", tt.username, tt.email, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestAccessValidatorFirstUserBypass tests first user bypass logic
+func TestAccessValidatorFirstUserBypass(t *testing.T) {
+	config := &AccessControlConfig{
+		Enabled:        true,
+		AllowFirstUser: true,
+		AllowedUsers:   []string{}, // Empty whitelist
+	}
+
+	// This test would require a real database
+	// For now, we just verify the logic
+	validator := NewAccessValidator(config, nil)
+	allowed := validator.ShouldAllowFirstUser()
+	if !allowed {
+		t.Errorf("ShouldAllowFirstUser() = %v, expected true", allowed)
+	}
+
+	// Test with AllowFirstUser disabled
+	config.AllowFirstUser = false
+	validator = NewAccessValidator(config, nil)
+	allowed = validator.ShouldAllowFirstUser()
+	if allowed {
+		t.Errorf("ShouldAllowFirstUser() = %v, expected false", allowed)
+	}
+}
+
+// TestOAuthStateGeneration tests OAuth state token generation
+func TestOAuthStateGeneration(t *testing.T) {
+	db := newTestDatabase(t)
+	manager := NewOAuthStateManager(db)
+
+	state1, err := manager.GenerateState("google")
+	if err != nil {
+		t.Fatalf("GenerateState failed: %v", err)
+	}
+
+	// State should not be empty
+	if state1 == "" {
+		t.Errorf("Generated state is empty")
+	}
+
+	// Generate another state, should be different
+	state2, err := manager.GenerateState("google")
+	if err != nil {
+		t.Fatalf("GenerateState failed: %v", err)
+	}
+
+	if state1 == state2 {
+		t.Errorf("Generated states are identical (should be random)")
+	}
+}
+
+// TestOAuthStateValidation tests OAuth state token validation
+func TestOAuthStateValidation(t *testing.T) {
+	db := newTestDatabase(t)
+	manager := NewOAuthStateManager(db)
+
+	// Generate a state
+	state, err := manager.GenerateState("google")
+	if err != nil {
+		t.Fatalf("GenerateState failed: %v", err)
+	}
+
+	// Validate the state
+	provider, nonce, err := manager.ValidateState(state)
+	if err != nil {
+		t.Errorf("ValidateState failed: %v", err)
+	}
+
+	if provider != "google" {
+		t.Errorf("Provider = %q, expected google", provider)
+	}
+
+	if nonce == "" {
+		t.Errorf("Nonce is empty, expected non-empty")
+	}
+
+	// State should be deleted after validation (one-time use)
+	_, _, err = manager.ValidateState(state)
+	if err == nil {
+		t.Errorf("Reusing same state should fail, but got nil error")
+	}
+}
+
+// TestOAuthStateExpiration tests OAuth state token expiration
+func TestOAuthStateExpiration(t *testing.T) {
+	db := newTestDatabase(t)
+	manager := NewOAuthStateManager(db)
+
+	state, err := manager.GenerateState("google")
+	if err != nil {
+		t.Fatalf("GenerateState failed: %v", err)
+	}
+
+	// Manually expire the state in database
+	query := `UPDATE oauth_state_tokens SET expires_at = ? WHERE state = ?`
+	_, err = db.GetDB().Exec(query, time.Now().Add(-1*time.Second), state)
+	if err != nil {
+		t.Fatalf("Failed to expire state in database: %v", err)
+	}
+
+	// Validation should fail
+	_, _, err = manager.ValidateState(state)
+	if err == nil {
+		t.Errorf("ValidateState with expired state should fail, got nil error")
+	}
+}
+
+// TestAccessValidatorDenyMessage tests custom deny message
+func TestAccessValidatorDenyMessage(t *testing.T) {
+	customMessage := "You are not authorized to access this service"
+	config := &AccessControlConfig{
+		Enabled:        true,
+		AllowedUsers:   []string{"allowed"},
+		AllowedDomains: []string{},
+		DenyMessage:    customMessage,
+	}
+
+	validator := NewAccessValidator(config, nil)
+
+	err := validator.ValidateUser("denied", "denied@example.com")
+	if err == nil {
+		t.Fatalf("ValidateUser should return error for denied user")
+	}
+
+	if err.Error() != customMessage {
+		t.Errorf("Error message = %q, expected %q", err.Error(), customMessage)
+	}
+}
+
+// TestUsernameGeneration tests username generation from email
+func TestUsernameGeneration(t *testing.T) {
+	server := &Server{}
+
+	tests := []struct {
+		email    string
+		expected string
+	}{
+		{"john.doe@example.com", "john_doe"},
+		{"user+test@example.com", "user_test"},
+		{"simple@example.com", "simple"},
+		{"user-name@example.com", "user_name"},
+	}
+
+	for _, tt := range tests {
+		result := server.generateUsernameFromEmail(tt.email)
+		if result != tt.expected {
+			t.Errorf("generateUsernameFromEmail(%q) = %q, expected %q", tt.email, result, tt.expected)
+		}
+	}
+}
+
+// TestDomainPatternMatchingSubdomains tests subdomain matching edge cases
+func TestDomainPatternMatchingSubdomains(t *testing.T) {
+	config := &AccessControlConfig{
+		Enabled:        true,
+		AllowedDomains: []string{"*@example.com"},
+	}
+
+	validator := NewAccessValidator(config, nil)
+
+	tests := []struct {
+		name     string
+		email    string
+		expected bool
+	}{
+		{"exact domain", "user@example.com", true},
+		{"one level subdomain", "user@dept.example.com", true},
+		{"two level subdomain", "user@team.dept.example.com", true},
+		{"three level subdomain", "user@a.b.c.example.com", true},
+		{"similar but different domain", "user@examplecom.net", false},
+		{"similar but different domain 2", "user@notexample.com", false},
+	}
+
+	for _, tt := range tests {
+		result := validator.matchesDomainPattern(tt.email, "*@example.com")
+		if result != tt.expected {
+			t.Errorf("%s: matchesDomainPattern(%q) = %v, expected %v", tt.name, tt.email, result, tt.expected)
+		}
+	}
+}

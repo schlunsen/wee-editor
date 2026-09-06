@@ -1,0 +1,88 @@
+/**
+ * Tool Use Indicators Styles
+ * Styling for tool use badges and their interactions
+ */
+
+.tool-uses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tool-use {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  max-width: 100%;
+  word-break: break-word;
+
+  svg {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.tool-use.clickable {
+  cursor: pointer;
+  border: 1px solid transparent;
+
+  &:hover {
+    background: var(--accent-purple);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(var(--accent-purple-rgb, 139, 92, 246), 0.3);
+
+    .tool-detail {
+      color: var(--overlay-text-active);
+    }
+  }
+}
+
+.tool-detail {
+  color: var(--accent-purple);
+  font-weight: 500;
+  margin-left: 4px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.click-icon {
+  margin-left: 4px;
+  opacity: 0.6;
+  width: 12px;
+  height: 12px;
+}
+
+// Tool use grouping (if implemented in future)
+.tool-uses-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.tool-uses-category {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tool-uses-category-label {
+  width: 100%;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: -6px;
+}

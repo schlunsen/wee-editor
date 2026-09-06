@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code Analytics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            min-height: 100vh;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 0.95rem;
+            color: #666;
+            font-weight: 400;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            color: #666;
+            margin-top: 16px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+        }
+
+        .status.loading .status-dot {
+            background: #ff9800;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .section {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 24px;
+            letter-spacing: -0.01em;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+        }
+
+        .stat-card {
+            padding: 0;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #666;
+            font-weight: 400;
+        }
+
+        .process-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .process-item {
+            padding: 16px;
+            background: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            transition: border-color 0.2s;
+        }
+
+        .process-item:hover {
+            border-color: #d0d0d0;
+        }
+
+        .process-info {
+            flex: 1;
+        }
+
+        .process-pid {
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.875rem;
+            color: #1a1a1a;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .process-command {
+            font-size: 0.875rem;
+            color: #666;
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+
+        .process-dir {
+            font-size: 0.8125rem;
+            color: #999;
+        }
+
+        .process-status {
+            padding: 4px 10px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 4px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .background-shell {
+            background: #f0f4ff;
+            border: 1px solid #d0dcf0;
+        }
+
+        .background-shell .process-status {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 0.875rem;
+        }
+
+        .endpoints {
+            display: grid;
+            gap: 8px;
+        }
+
+        .endpoint {
+            padding: 12px 16px;
+            background: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 6px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.8125rem;
+            color: #1a1a1a;
+        }
+
+        .endpoint code {
+            color: #0066cc;
+            font-weight: 500;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 32px;
+            border-top: 1px solid #e0e0e0;
+            color: #999;
+            font-size: 0.8125rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: #2d3748;
+            color: #f7fafc;
+            border: 1px solid #4a5568;
+        }
+
+        .btn-primary:hover {
+            background: #1a202c;
+            border-color: #2d3748;
+        }
+
+        .btn-warning {
+            background: #edf2f7;
+            color: #2d3748;
+            border: 1px solid #cbd5e0;
+        }
+
+        .btn-warning:hover {
+            background: #e2e8f0;
+            border-color: #a0aec0;
+        }
+
+        .btn-danger {
+            background: #fff5f5;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .btn-danger:hover {
+            background: #fed7d7;
+            border-color: #fc8181;
+        }
+
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 1px solid #cbd5e0;
+        }
+
+        .btn-secondary:hover {
+            background: #edf2f7;
+            border-color: #a0aec0;
+        }
+
+        .reset-info {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            color: #92400e;
+            display: none;
+        }
+
+        .reset-info.active {
+            display: block;
+        }
+
+        .reset-info strong {
+            color: #78350f;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Command History Styles */
+        .search-box {
+            margin-bottom: 24px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #666;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 0;
+        }
+
+        .filter-tab {
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .filter-tab:hover {
+            color: #1a1a1a;
+        }
+
+        .filter-tab.active {
+            color: #1a1a1a;
+            border-bottom-color: #1a1a1a;
+        }
+
+        .command-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .command-item {
+            padding: 16px;
+            background: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 6px;
+            transition: border-color 0.2s;
+        }
+
+        .command-item:hover {
+            border-color: #d0d0d0;
+        }
+
+        .command-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            gap: 12px;
+        }
+
+        .command-tool {
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.875rem;
+            color: #1a1a1a;
+            font-weight: 500;
+        }
+
+        .command-time {
+            font-size: 0.8125rem;
+            color: #999;
+            white-space: nowrap;
+        }
+
+        .command-text {
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.8125rem;
+            color: #1a1a1a;
+            padding: 8px 12px;
+            background: #fff;
+            border: 1px solid #e8e8e8;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+
+        .command-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 0.8125rem;
+            color: #666;
+        }
+
+        .command-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .command-meta-label {
+            color: #999;
+        }
+
+        .command-branch {
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            color: #0066cc;
+        }
+
+        .command-success {
+            color: #2e7d32;
+        }
+
+        .command-error {
+            color: #c53030;
+        }
+
+        .command-warning {
+            color: #d97706;
+        }
+
+        .notification-item {
+            background: #fffbf0;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .notification-permission {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+        }
+
+        .notification-idle {
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .command-details-code {
+            display: inline-block;
+            background: #f3f4f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 13px;
+            color: #1f2937;
+            max-width: 600px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .load-more {
+            text-align: center;
+            padding: 16px;
+        }
+
+        .load-more-btn {
+            padding: 10px 20px;
+            background: #f7fafc;
+            color: #4a5568;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .load-more-btn:hover {
+            background: #edf2f7;
+            border-color: #a0aec0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Claude Code Analytics</h1>
+            <p class="subtitle">Real-time monitoring and process management</p>
+            <div id="status" class="status loading">
+                <div class="status-dot"></div>
+                <span>Loading analytics data...</span>
+            </div>
+        </header>
+
+        <div class="section">
+            <h2 class="section-title">Overview</h2>
+            <div class="stats" id="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="conversations">—</div>
+                    <div class="stat-label">Conversations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tokens">—</div>
+                    <div class="stat-label">Total Tokens</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="active">—</div>
+                    <div class="stat-label">Active Sessions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="processes">—</div>
+                    <div class="stat-label">Running Processes</div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-primary" onclick="softReset()">🔄 Soft Reset</button>
+                <button class="btn btn-secondary" id="clear-reset-btn" onclick="clearReset()" style="display: none;">↩️ Undo Reset</button>
+            </div>
+
+            <div class="reset-info" id="reset-info">
+                <strong>Soft Reset Active:</strong> <span id="reset-details"></span>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="section">
+                <h2 class="section-title">Claude Processes</h2>
+                <div class="process-list" id="claude-processes">
+                    <div class="empty-state">No Claude processes detected</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Background Shells</h2>
+                <div class="process-list" id="background-shells">
+                    <div class="empty-state">No background shells running</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Activity History</h2>
+
+            <div class="search-box">
+                <input type="text" id="search-input" class="search-input" placeholder="Search activity..." oninput="searchHistory()">
+            </div>
+
+            <div class="search-box">
+                <select id="session-filter" class="search-input" onchange="filterBySession()" style="cursor: pointer;">
+                    <option value="">All Sessions</option>
+                </select>
+            </div>
+
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-type="all" onclick="filterHistory('all')">All</button>
+                <button class="filter-tab" data-type="shell" onclick="filterHistory('shell')">Shell</button>
+                <button class="filter-tab" data-type="claude" onclick="filterHistory('claude')">Claude</button>
+                <button class="filter-tab" data-type="prompt" onclick="filterHistory('prompt')">Prompts</button>
+                <button class="filter-tab" data-type="notification" onclick="filterHistory('notification')">Notifications</button>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-danger" onclick="clearAllHistory()">🗑️ Clear All History</button>
+            </div>
+
+            <div class="command-list" id="activity-history">
+                <div class="empty-state">No activity recorded yet</div>
+            </div>
+
+            <div class="load-more" id="load-more" style="display: none;">
+                <button class="load-more-btn" onclick="loadMoreHistory()">Load More</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Notification Insights</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="permission-requests">—</div>
+                    <div class="stat-label">Permission Requests</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="idle-alerts">—</div>
+                    <div class="stat-label">Idle Alerts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="total-notifications">—</div>
+                    <div class="stat-label">Total Notifications</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="most-requested-tool">—</div>
+                    <div class="stat-label">Most Requested Tool</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">API Endpoints</h2>
+            <div class="endpoints">
+                <div class="endpoint">GET <code>/api/data</code> — Complete analytics data</div>
+                <div class="endpoint">GET <code>/api/conversations</code> — All conversations</div>
+                <div class="endpoint">GET <code>/api/processes</code> — Running Claude processes</div>
+                <div class="endpoint">GET <code>/api/shells</code> — Background bash shells</div>
+                <div class="endpoint">GET <code>/api/stats</code> — Statistics summary</div>
+                <div class="endpoint">GET <code>/api/history/shell</code> — Shell command history</div>
+                <div class="endpoint">GET <code>/api/history/claude</code> — Claude command history</div>
+                <div class="endpoint">GET <code>/api/history/stats</code> — Command statistics</div>
+                <div class="endpoint">GET <code>/api/prompts</code> — User prompts history</div>
+                <div class="endpoint">GET <code>/api/prompts/stats</code> — Prompt statistics</div>
+                <div class="endpoint">GET <code>/api/notifications</code> — Notifications history</div>
+                <div class="endpoint">GET <code>/api/notifications/stats</code> — Notification statistics</div>
+                <div class="endpoint">GET <code>/ws</code> — WebSocket real-time updates</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Wee
+        </div>
+    </div>
+
+    <script>
+        // Fetch analytics data
+        async function loadData() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+
+                document.getElementById('conversations').textContent = data.totalConversations || 0;
+                document.getElementById('tokens').textContent = (data.totalTokens || 0).toLocaleString();
+                document.getElementById('active').textContent = data.activeConversations || 0;
+
+                const processResponse = await fetch('/api/data');
+                const processData = await processResponse.json();
+                document.getElementById('processes').textContent = processData.activeProcessCount || 0;
+
+                // Update reset status display
+                updateResetStatus(data);
+
+                // Load Claude processes
+                const claudeResponse = await fetch('/api/processes');
+                const claudeData = await claudeResponse.json();
+                updateClaudeProcesses(claudeData.processes || []);
+
+                // Update status
+                const status = document.getElementById('status');
+                status.innerHTML = '<div class="status-dot"></div><span>Analytics running</span>';
+                status.classList.remove('loading');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                const status = document.getElementById('status');
+                status.innerHTML = '<div class="status-dot" style="background: #f44336;"></div><span>Error loading data</span>';
+                status.classList.remove('loading');
+            }
+        }
+
+        // Update reset status display
+        function updateResetStatus(data) {
+            const resetInfo = document.getElementById('reset-info');
+            const resetDetails = document.getElementById('reset-details');
+            const clearResetBtn = document.getElementById('clear-reset-btn');
+
+            if (data.resetActive) {
+                const resetDate = new Date(data.resetTimestamp);
+                resetDetails.textContent = `Reset since ${resetDate.toLocaleString()} - ${data.resetReason}`;
+                resetInfo.classList.add('active');
+                clearResetBtn.style.display = 'inline-block';
+            } else {
+                resetInfo.classList.remove('active');
+                clearResetBtn.style.display = 'none';
+            }
+        }
+
+        // Soft reset (recommended - delta-based)
+        async function softReset() {
+            if (!confirm('Apply soft reset? This will reset counts to zero without deleting any data. You can undo this later.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/reset/soft', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.status === 'reset') {
+                    alert(`✅ ${data.message}\n\nPrevious: ${data.previousTokens.toLocaleString()} tokens, ${data.previousConversations} conversations`);
+                    loadData();
+                    loadBackgroundShells();
+                } else {
+                    alert('❌ Reset failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('❌ Error performing soft reset: ' + error.message);
+            }
+        }
+
+        // Clear soft reset (restore original counts)
+        async function clearReset() {
+            if (!confirm('Restore original counts? This will undo the soft reset.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/reset', { method: 'DELETE' });
+                const data = await response.json();
+
+                alert(`✅ ${data.message}`);
+                loadData();
+                loadBackgroundShells();
+            } catch (error) {
+                alert('❌ Error clearing reset: ' + error.message);
+            }
+        }
+
+        // Archive reset (moves files to archive)
+        async function archiveReset() {
+            if (!confirm('⚠️ Archive all conversations?\n\nThis will move all conversation files to an archive folder. You can recover them later if needed.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/reset/archive', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.status === 'archived') {
+                    alert(`✅ ${data.message}`);
+                    loadData();
+                    loadBackgroundShells();
+                } else {
+                    alert('❌ Archive failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('❌ Error archiving conversations: ' + error.message);
+            }
+        }
+
+        // Hard reset (permanent delete)
+        async function hardReset() {
+            if (!confirm('⚠️ DANGER: Permanently delete ALL conversations?\n\nThis action CANNOT be undone. All conversation data will be lost forever.\n\nType "DELETE" in the next prompt to confirm.')) {
+                return;
+            }
+
+            const confirmation = prompt('Type DELETE (in capital letters) to confirm permanent deletion:');
+            if (confirmation !== 'DELETE') {
+                alert('Deletion cancelled.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/reset/clear', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.status === 'cleared') {
+                    alert(`✅ ${data.message}`);
+                    loadData();
+                    loadBackgroundShells();
+                } else {
+                    alert('❌ Delete failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('❌ Error deleting conversations: ' + error.message);
+            }
+        }
+
+        // Update Claude processes display
+        function updateClaudeProcesses(processes) {
+            const container = document.getElementById('claude-processes');
+
+            if (!processes || processes.length === 0) {
+                container.innerHTML = '<div class="empty-state">No Claude processes detected</div>';
+                return;
+            }
+
+            container.innerHTML = processes.map(proc => `
+                <div class="process-item">
+                    <div class="process-info">
+                        <div class="process-pid">PID ${proc.PID}</div>
+                        <div class="process-command">${escapeHtml(proc.Command)}</div>
+                        <div class="process-dir">${escapeHtml(proc.WorkingDir)}</div>
+                    </div>
+                    <div class="process-status">${proc.Status}</div>
+                </div>
+            `).join('');
+        }
+
+        // Fetch background shells
+        async function loadBackgroundShells() {
+            try {
+                const response = await fetch('/api/shells');
+                const data = await response.json();
+                updateBackgroundShells(data.shells || []);
+            } catch (error) {
+                console.error('Error loading background shells:', error);
+                const container = document.getElementById('background-shells');
+                container.innerHTML = '<div class="empty-state">Error loading background shells</div>';
+            }
+        }
+
+        // Update background shells display
+        function updateBackgroundShells(shells) {
+            const container = document.getElementById('background-shells');
+
+            if (!shells || shells.length === 0) {
+                container.innerHTML = '<div class="empty-state">No background shells running</div>';
+                return;
+            }
+
+            container.innerHTML = shells.map(shell => `
+                <div class="process-item background-shell">
+                    <div class="process-info">
+                        <div class="process-pid">${shell.shell_id ? 'Shell #' + shell.shell_id : 'PID ' + shell.pid}</div>
+                        <div class="process-command">${escapeHtml(shell.command)}</div>
+                        <div class="process-dir">${escapeHtml(shell.working_dir || 'Unknown directory')}</div>
+                    </div>
+                    <div class="process-status">${shell.status}</div>
+                </div>
+            `).join('');
+        }
+
+        // Utility function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load notification statistics
+        async function loadNotificationStats() {
+            try {
+                const response = await fetch('/api/notifications/stats');
+                const stats = await response.json();
+
+                document.getElementById('permission-requests').textContent = stats.permission_requests || 0;
+                document.getElementById('idle-alerts').textContent = stats.idle_alerts || 0;
+                document.getElementById('total-notifications').textContent = stats.total_notifications || 0;
+                document.getElementById('most-requested-tool').textContent = stats.most_requested_tool || 'None';
+            } catch (error) {
+                console.error('Error loading notification stats:', error);
+                document.getElementById('permission-requests').textContent = '—';
+                document.getElementById('idle-alerts').textContent = '—';
+                document.getElementById('total-notifications').textContent = '—';
+                document.getElementById('most-requested-tool').textContent = '—';
+            }
+        }
+
+        // WebSocket connection
+        function connectWebSocket() {
+            const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                console.log('WebSocket message:', event.data);
+
+                // Refresh all data on any WebSocket event
+                loadData();
+                loadBackgroundShells();
+                loadAvailableSessions();
+                loadActivityHistory();
+                loadNotificationStats();
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket closed, reconnecting...');
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        // Unified Activity History State
+        let allHistory = [];
+        let filteredHistory = [];
+        let currentFilter = 'all';
+        let currentSessionFilter = '';
+        let currentOffset = 0;
+        let availableSessions = [];
+        const HISTORY_PER_PAGE = 100;
+
+        // Load available sessions from all tables
+        async function loadAvailableSessions() {
+            try {
+                const response = await fetch('/api/prompts/sessions');
+                const data = await response.json();
+                availableSessions = data.sessions || [];
+
+                // Populate session filter dropdown
+                const sessionFilter = document.getElementById('session-filter');
+                sessionFilter.innerHTML = '<option value="">All Sessions</option>';
+
+                availableSessions.forEach(session => {
+                    const option = document.createElement('option');
+                    option.value = session.conversation_id;
+                    option.textContent = session.session_name ?
+                        `${session.session_name} (${session.conversation_id.substring(0, 8)}...)` :
+                        session.conversation_id.substring(0, 12) + '...';
+                    sessionFilter.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+
+        // Load unified activity history
+        async function loadActivityHistory() {
+            try {
+                let url = `/api/history/all?limit=${HISTORY_PER_PAGE}&offset=0`;
+                if (currentSessionFilter) {
+                    url += `&conversation_id=${encodeURIComponent(currentSessionFilter)}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                allHistory = (data.history || []).map(item => ({
+                    ...item.content,
+                    type: item.type,
+                    timestamp: item.timestamp,
+                    session_name: item.session_name || item.content.session_name
+                }));
+
+                currentOffset = 0;
+                applyFiltersAndSearch();
+            } catch (error) {
+                console.error('Error loading activity history:', error);
+                document.getElementById('activity-history').innerHTML =
+                    '<div class="empty-state">Error loading activity history</div>';
+            }
+        }
+
+        // Load more history
+        async function loadMoreHistory() {
+            currentOffset += HISTORY_PER_PAGE;
+
+            try {
+                let url = `/api/history/all?limit=${HISTORY_PER_PAGE}&offset=${currentOffset}`;
+                if (currentSessionFilter) {
+                    url += `&conversation_id=${encodeURIComponent(currentSessionFilter)}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                const newHistory = (data.history || []).map(item => ({
+                    ...item.content,
+                    type: item.type,
+                    timestamp: item.timestamp,
+                    session_name: item.session_name || item.content.session_name
+                }));
+
+                allHistory = [...allHistory, ...newHistory];
+                applyFiltersAndSearch();
+            } catch (error) {
+                console.error('Error loading more history:', error);
+            }
+        }
+
+        // Filter history by type
+        function filterHistory(type) {
+            currentFilter = type;
+
+            // Update active tab
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-type="${type}"]`).classList.add('active');
+
+            applyFiltersAndSearch();
+        }
+
+        // Filter by session
+        function filterBySession() {
+            currentSessionFilter = document.getElementById('session-filter').value;
+            currentOffset = 0;
+            allHistory = [];
+            loadActivityHistory();
+        }
+
+        // Search history
+        function searchHistory() {
+            applyFiltersAndSearch();
+        }
+
+        // Apply filters and search
+        function applyFiltersAndSearch() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+
+            filteredHistory = allHistory.filter(item => {
+                // Apply type filter
+                if (currentFilter !== 'all' && item.type !== currentFilter) {
+                    return false;
+                }
+
+                // Apply search filter
+                if (searchTerm) {
+                    const searchableText = [
+                        item.command || '',
+                        item.tool_name || '',
+                        item.message || '',
+                        item.git_branch || '',
+                        item.working_directory || '',
+                        item.notification_type || ''
+                    ].join(' ').toLowerCase();
+
+                    return searchableText.includes(searchTerm);
+                }
+
+                return true;
+            });
+
+            displayHistory();
+        }
+
+        // Display history
+        function displayHistory() {
+            const container = document.getElementById('activity-history');
+            const loadMore = document.getElementById('load-more');
+
+            if (filteredHistory.length === 0) {
+                container.innerHTML = '<div class="empty-state">No activity found</div>';
+                loadMore.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = filteredHistory.map(item => {
+                const time = new Date(item.timestamp || item.executed_at || item.submitted_at || item.notified_at).toLocaleString();
+                const isShell = item.type === 'shell';
+                const isClaude = item.type === 'claude';
+                const isPrompt = item.type === 'prompt';
+                const isNotification = item.type === 'notification';
+
+                let metaItems = [];
+
+                // Add session name if available
+                if (item.session_name) {
+                    metaItems.push(`<div class="command-meta-item">
+                        <span class="command-meta-label">Session:</span>
+                        <span>${escapeHtml(item.session_name)}</span>
+                    </div>`);
+                }
+
+                if (item.git_branch) {
+                    metaItems.push(`<div class="command-meta-item">
+                        <span class="command-meta-label">Branch:</span>
+                        <span class="command-branch">${escapeHtml(item.git_branch)}</span>
+                    </div>`);
+                }
+
+                if (item.working_directory) {
+                    metaItems.push(`<div class="command-meta-item">
+                        <span class="command-meta-label">Dir:</span>
+                        <span>${escapeHtml(item.working_directory)}</span>
+                    </div>`);
+                }
+
+                if (isShell && item.exit_code !== null && item.exit_code !== undefined) {
+                    const exitClass = item.exit_code === 0 ? 'command-success' : 'command-error';
+                    metaItems.push(`<div class="command-meta-item ${exitClass}">
+                        Exit: ${item.exit_code}
+                    </div>`);
+                }
+
+                if (isClaude) {
+                    const statusClass = item.success ? 'command-success' : 'command-error';
+                    const statusText = item.success ? 'Success' : 'Error';
+                    metaItems.push(`<div class="command-meta-item ${statusClass}">
+                        ${statusText}
+                    </div>`);
+                }
+
+                if (item.duration_ms) {
+                    metaItems.push(`<div class="command-meta-item">
+                        ${item.duration_ms}ms
+                    </div>`);
+                }
+
+                if (isPrompt && item.message_length) {
+                    metaItems.push(`<div class="command-meta-item">
+                        <span class="command-meta-label">Length:</span>
+                        <span>${item.message_length} chars</span>
+                    </div>`);
+                }
+
+                // Notification-specific metadata
+                if (isNotification) {
+                    if (item.notification_type === 'permission_request' && item.tool_name) {
+                        metaItems.push(`<div class="command-meta-item">
+                            <span class="command-meta-label">Tool:</span>
+                            <span class="command-tool">${escapeHtml(item.tool_name)}</span>
+                        </div>`);
+                    }
+
+                    if (item.notification_type === 'idle_alert') {
+                        metaItems.push(`<div class="command-meta-item command-warning">
+                            ⏱️ Idle
+                        </div>`);
+                    }
+                }
+
+                // Determine tool name/label
+                let toolLabel = '';
+                let notificationClass = '';
+                if (isShell) {
+                    toolLabel = 'Bash';
+                } else if (isClaude) {
+                    toolLabel = item.tool_name || 'Claude Tool';
+                } else if (isPrompt) {
+                    toolLabel = '💬 User Prompt';
+                } else if (isNotification) {
+                    switch(item.notification_type) {
+                        case 'permission_request':
+                            toolLabel = '🔐 Permission Request';
+                            notificationClass = 'notification-permission';
+                            break;
+                        case 'idle_alert':
+                            toolLabel = '⏱️ Idle Alert';
+                            notificationClass = 'notification-idle';
+                            break;
+                        default:
+                            toolLabel = '🔔 Notification';
+                            notificationClass = 'notification-item';
+                    }
+                }
+
+                // Determine display text
+                let displayText = '';
+                if (isShell) {
+                    displayText = item.command || '';
+                } else if (isClaude) {
+                    // Show tool name with key parameter
+                    let toolDisplay = item.tool_name || 'Claude Tool';
+
+                    // Parse parameters to extract key info
+                    try {
+                        const params = JSON.parse(item.parameters || '{}');
+                        let keyParam = '';
+
+                        switch(item.tool_name) {
+                            case 'WebFetch':
+                                keyParam = params.url || '';
+                                break;
+                            case 'Read':
+                            case 'Edit':
+                            case 'Write':
+                                keyParam = params.file_path || '';
+                                break;
+                            case 'Glob':
+                                keyParam = params.pattern || '';
+                                break;
+                            case 'Grep':
+                                keyParam = params.pattern || '';
+                                break;
+                            default:
+                                // For other tools, show first parameter value if available
+                                const values = Object.values(params);
+                                if (values.length > 0 && typeof values[0] === 'string') {
+                                    keyParam = values[0];
+                                }
+                        }
+
+                        if (keyParam) {
+                            // Truncate long parameters
+                            if (keyParam.length > 100) {
+                                keyParam = keyParam.substring(0, 100) + '...';
+                            }
+                            toolDisplay = `${item.tool_name}(${keyParam})`;
+                        }
+                    } catch (e) {
+                        // If JSON parsing fails, just show tool name
+                    }
+
+                    displayText = toolDisplay;
+                } else if (isPrompt) {
+                    let msg = item.message || '';
+                    const maxLength = 500;
+                    if (msg.length > maxLength) {
+                        msg = msg.substring(0, maxLength) + '...\n<em style="color: #999;">(truncated)</em>';
+                    }
+                    displayText = msg;
+                } else if (isNotification) {
+                    // For permission requests, show the actual command if available
+                    if (item.notification_type === 'permission_request' && item.command_details) {
+                        displayText = item.command_details;
+                    } else {
+                        displayText = item.message || '';
+                    }
+                }
+
+                return `
+                    <div class="command-item ${notificationClass}">
+                        <div class="command-header">
+                            <div class="command-tool">${escapeHtml(toolLabel)}</div>
+                            <div class="command-time">${time}</div>
+                        </div>
+                        <div class="command-text">${escapeHtml(displayText)}</div>
+                        <div class="command-meta">
+                            ${metaItems.join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Show load more button if there might be more items
+            loadMore.style.display = allHistory.length >= HISTORY_PER_PAGE ? 'block' : 'none';
+        }
+
+        // Clear all history
+        async function clearAllHistory() {
+            if (!confirm('⚠️ Delete ALL history?\n\nThis action will permanently delete all recorded user prompts, shell commands, and Claude commands from the database. This CANNOT be undone.\n\nAre you sure?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/history', { method: 'DELETE' });
+                const data = await response.json();
+
+                if (data.status === 'cleared') {
+                    alert(`✅ ${data.message}`);
+                    currentSessionFilter = '';
+                    document.getElementById('session-filter').value = '';
+                    loadAvailableSessions();
+                    loadActivityHistory();
+                } else {
+                    alert('❌ Clear failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('❌ Error clearing history: ' + error.message);
+            }
+        }
+
+        // Initialize - load data once on page load
+        loadData();
+        loadBackgroundShells();
+        loadAvailableSessions();
+        loadActivityHistory();
+        loadNotificationStats();
+        connectWebSocket();
+
+        // No more polling - updates come via WebSocket events only
+    </script>
+</body>
+</html>

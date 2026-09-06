@@ -1,0 +1,345 @@
+package agents
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+
+	"github.com/schlunsen/wee-editor/internal/logging"
+)
+
+// ClaudeSettings represents the structure of .claude/settings.local.json
+type ClaudeSettings struct {
+	Permissions struct {
+		Allow []string `json:"allow"`
+	} `json:"permissions"`
+	EnableAllProjectMcpServers bool     `json:"enableAllProjectMcpServers,omitempty"`
+	EnabledMcpjsonServers      []string `json:"enabledMcpjsonServers,omitempty"`
+	Hooks                      any      `json:"hooks,omitempty"`
+}
+
+// ClaudeSettingsManager manages .claude/settings.local.json
+type ClaudeSettingsManager struct {
+	workingDir string
+	mu         sync.RWMutex
+}
+
+// NewClaudeSettingsManager creates a new settings manager for the given working directory
+func NewClaudeSettingsManager(workingDir string) *ClaudeSettingsManager {
+	return &ClaudeSettingsManager{
+		workingDir: workingDir,
+	}
+}
+
+// getSettingsPath returns the path to settings.local.json
+func (csm *ClaudeSettingsManager) getSettingsPath() string {
+	return filepath.Join(csm.workingDir, ".claude", "settings.local.json")
+}
+
+// LoadSettings loads settings from .claude/settings.local.json
+func (csm *ClaudeSettingsManager) LoadSettings() (*ClaudeSettings, error) {
+	csm.mu.RLock()
+	defer csm.mu.RUnlock()
+
+	settingsPath := csm.getSettingsPath()
+
+	// Check if file exists
+	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+		// Return empty settings if file doesn't exist
+		return &ClaudeSettings{}, nil
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read settings file: %w", err)
+	}
+
+	var settings ClaudeSettings
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return nil, fmt.Errorf("failed to parse settings file: %w", err)
+	}
+
+	// Deduplicate permissions on load to clean up any existing duplicates
+	settings.Permissions.Allow = deduplicatePermissions(settings.Permissions.Allow)
+
+	return &settings, nil
+}
+
+// SaveSettings saves settings to .claude/settings.local.json
+func (csm *ClaudeSettingsManager) SaveSettings(settings *ClaudeSettings) error {
+	csm.mu.Lock()
+	defer csm.mu.Unlock()
+
+	settingsPath := csm.getSettingsPath()
+
+	// Ensure .claude directory exists
+	claudeDir := filepath.Dir(settingsPath)
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		return fmt.Errorf("failed to create .claude directory: %w", err)
+	}
+
+	// Deduplicate permissions before saving
+	settings.Permissions.Allow = deduplicatePermissions(settings.Permissions.Allow)
+
+	// Marshal with pretty printing
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write settings file: %w", err)
+	}
+
+	logging.Info("✅ Saved settings to %s", settingsPath)
+	return nil
+}
+
+// AddPermission adds a permission string to the allow list
+func (csm *ClaudeSettingsManager) AddPermission(permission string) error {
+	settings, err := csm.LoadSettings()
+	if err != nil {
+		return err
+	}
+
+	// Check if permission already exists
+	for _, p := range settings.Permissions.Allow {
+		if p == permission {
+			logging.Info("Permission already exists: %s", permission)
+			return nil
+		}
+	}
+
+	// Add permission
+	settings.Permissions.Allow = append(settings.Permissions.Allow, permission)
+
+	return csm.SaveSettings(settings)
+}
+
+// RemovePermission removes a permission string from the allow list
+func (csm *ClaudeSettingsManager) RemovePermission(permission string) error {
+	settings, err := csm.LoadSettings()
+	if err != nil {
+		return err
+	}
+
+	// Filter out the permission
+	newAllowList := []string{}
+	found := false
+	for _, p := range settings.Permissions.Allow {
+		if p != permission {
+			newAllowList = append(newAllowList, p)
+		} else {
+			found = true
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("permission not found: %s", permission)
+	}
+
+	settings.Permissions.Allow = newAllowList
+
+	return csm.SaveSettings(settings)
+}
+
+// GetAllowedPermissions returns the list of allowed permissions
+func (csm *ClaudeSettingsManager) GetAllowedPermissions() ([]string, error) {
+	settings, err := csm.LoadSettings()
+	if err != nil {
+		return nil, err
+	}
+
+	return settings.Permissions.Allow, nil
+}
+
+// FormatPermissionString formats a tool and pattern into Claude Desktop permission format
+// Examples:
+//   - "Bash", "*" -> "Bash(*)"
+//   - "Write", "*" -> "Write(**)"
+//   - "Read", "/path/to/dir/*" -> "Read(//path/to/dir/**)"
+func FormatPermissionString(toolName string, pattern *RulePattern) string {
+	if pattern == nil {
+		// No pattern, allow all
+		return fmt.Sprintf("%s(*)", toolName)
+	}
+
+	switch toolName {
+	case "Bash":
+		if pattern.CommandPrefix != nil && *pattern.CommandPrefix == "*" {
+			return "Bash(*)"
+		}
+		if pattern.CommandPrefix != nil {
+			return fmt.Sprintf("Bash(%s:*)", *pattern.CommandPrefix)
+		}
+
+	case "Read", "Write", "Edit":
+		if pattern.DirectoryPath != nil {
+			dirPath := *pattern.DirectoryPath
+			// Handle wildcard patterns
+			if dirPath == "*" || dirPath == "/**" {
+				// Wildcard - allow all files (use ** format for Read/Write/Edit)
+				return fmt.Sprintf("%s(**)", toolName)
+			}
+			// Specific directory path - convert to absolute path with double slash prefix
+			return fmt.Sprintf("%s(//%s/**)", toolName, dirPath)
+		}
+
+	case "Grep", "Glob":
+		if pattern.PathPattern != nil && *pattern.PathPattern == "*" {
+			return fmt.Sprintf("%s(*)", toolName)
+		}
+		if pattern.PathPattern != nil {
+			return fmt.Sprintf("%s(//%s)", toolName, *pattern.PathPattern)
+		}
+	}
+
+	// Fallback: allow all for this tool
+	return fmt.Sprintf("%s(*)", toolName)
+}
+
+// FormatExactPermissionString formats exact parameters as a permission string
+// This is used for "Allow exact" mode to create a literal match permission
+func FormatExactPermissionString(toolName string, parameters map[string]interface{}) string {
+	switch toolName {
+	case "Bash":
+		if cmd, ok := parameters["command"].(string); ok {
+			// Format as: Bash(exact:command)
+			// This creates a literal match for the exact command
+			return fmt.Sprintf("Bash(%s)", cmd)
+		}
+
+	case "Read":
+		if filePath, ok := parameters["file_path"].(string); ok {
+			// Format as: Read(//exact/path)
+			return fmt.Sprintf("Read(//%s)", filePath)
+		}
+
+	case "Write":
+		if filePath, ok := parameters["file_path"].(string); ok {
+			// Format as: Write(//exact/path)
+			return fmt.Sprintf("Write(//%s)", filePath)
+		}
+
+	case "Edit":
+		if filePath, ok := parameters["file_path"].(string); ok {
+			// Format as: Edit(//exact/path)
+			return fmt.Sprintf("Edit(//%s)", filePath)
+		}
+
+	case "Grep":
+		if pattern, ok := parameters["pattern"].(string); ok {
+			if path, pathOk := parameters["path"].(string); pathOk {
+				// Format as: Grep(pattern@path)
+				return fmt.Sprintf("Grep(%s@%s)", pattern, path)
+			}
+			// Just pattern
+			return fmt.Sprintf("Grep(%s)", pattern)
+		}
+
+	case "Glob":
+		if pattern, ok := parameters["pattern"].(string); ok {
+			// Format as: Glob(pattern)
+			return fmt.Sprintf("Glob(%s)", pattern)
+		}
+	}
+
+	// Fallback: allow all for this tool (not ideal for exact mode)
+	return fmt.Sprintf("%s(*)", toolName)
+}
+
+// ParsePermissionString parses a Claude Desktop permission string
+// Examples:
+//   - "Bash(*)" -> ("Bash", wildcard pattern)
+//   - "Write(//path/**)" -> ("Write", directory pattern)
+//   - "Bash(git:*)" -> ("Bash", command prefix pattern)
+func ParsePermissionString(permStr string) (toolName string, pattern *RulePattern, err error) {
+	// Simple parser for Claude Desktop format
+	// Format: ToolName(pattern)
+
+	if len(permStr) < 3 {
+		return "", nil, fmt.Errorf("invalid permission string: %s", permStr)
+	}
+
+	// Find opening parenthesis
+	openParen := -1
+	for i, c := range permStr {
+		if c == '(' {
+			openParen = i
+			break
+		}
+	}
+
+	if openParen == -1 || permStr[len(permStr)-1] != ')' {
+		return "", nil, fmt.Errorf("invalid permission format: %s", permStr)
+	}
+
+	toolName = permStr[:openParen]
+	patternStr := permStr[openParen+1 : len(permStr)-1]
+
+	pattern = &RulePattern{}
+
+	// Handle wildcard
+	if patternStr == "*" {
+		switch toolName {
+		case "Bash":
+			pattern.CommandPrefix = stringPtr("*")
+		case "Read", "Write", "Edit":
+			pattern.DirectoryPath = stringPtr("*")
+			pattern.FilePathPattern = stringPtr("*")
+		case "Grep", "Glob":
+			pattern.PathPattern = stringPtr("*")
+		}
+		return toolName, pattern, nil
+	}
+
+	// Handle command prefix (e.g., "git:*")
+	if toolName == "Bash" && len(patternStr) > 2 && patternStr[len(patternStr)-2:] == ":*" {
+		prefix := patternStr[:len(patternStr)-2]
+		pattern.CommandPrefix = &prefix
+		return toolName, pattern, nil
+	}
+
+	// Handle file paths (e.g., "//path/**")
+	if len(patternStr) > 2 && patternStr[:2] == "//" {
+		cleanPath := patternStr[2:] // Remove leading //
+		// Remove trailing /** if present
+		if len(cleanPath) > 3 && cleanPath[len(cleanPath)-3:] == "/**" {
+			cleanPath = cleanPath[:len(cleanPath)-3]
+		}
+
+		switch toolName {
+		case "Read", "Write", "Edit":
+			pattern.DirectoryPath = &cleanPath
+			pattern.FilePathPattern = stringPtr(cleanPath + "/*")
+		case "Grep", "Glob":
+			pattern.PathPattern = &cleanPath
+		}
+		return toolName, pattern, nil
+	}
+
+	return toolName, pattern, nil
+}
+
+// deduplicatePermissions removes duplicate permission strings from a slice
+// while preserving the order of first occurrence
+func deduplicatePermissions(permissions []string) []string {
+	if len(permissions) == 0 {
+		return permissions
+	}
+
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(permissions))
+
+	for _, perm := range permissions {
+		if !seen[perm] {
+			seen[perm] = true
+			result = append(result, perm)
+		}
+	}
+
+	return result
+}

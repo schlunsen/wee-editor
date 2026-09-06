@@ -1,0 +1,75 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    @keyframes blink {
+      0%, 90%, 100% { opacity: 1; }
+      95% { opacity: 0; }
+    }
+    @keyframes whiskerTwitch {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(2deg); }
+      75% { transform: rotate(-2deg); }
+    }
+    @keyframes earWiggle {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    @keyframes colorBeam {
+      0% { stroke: #1a1a1a; }
+      20% { stroke: #667eea; }
+      40% { stroke: #764ba2; }
+      60% { stroke: #f093fb; }
+      80% { stroke: #667eea; }
+      100% { stroke: #1a1a1a; }
+    }
+    @keyframes underscoreType {
+      0%, 100% { stroke-dashoffset: 0; }
+      50% { stroke-dashoffset: 55; }
+    }
+    .cursor { animation: blink 4s ease-in-out infinite; }
+    .left-whiskers { transform-origin: 145px 300px; animation: whiskerTwitch 3s ease-in-out infinite; }
+    .right-whiskers { transform-origin: 367px 300px; animation: whiskerTwitch 3s ease-in-out infinite 1.5s; }
+    .left-ear { transform-origin: 178px 200px; animation: earWiggle 5s ease-in-out infinite; }
+    .right-ear { transform-origin: 334px 200px; animation: earWiggle 5s ease-in-out infinite 2.5s; }
+    .prompt { animation: colorBeam 8s ease-in-out infinite; }
+    .underscore {
+      stroke-dasharray: 55;
+      animation: colorBeam 8s ease-in-out infinite 0.5s, underscoreType 6s ease-in-out infinite;
+    }
+    .dot { animation: blink 4s ease-in-out infinite, colorBeam 8s ease-in-out infinite 1s; }
+  </style>
+
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="#F5F5F7"/>
+
+  <!-- left ear (chevron) -->
+  <g class="left-ear">
+    <path d="M140 200 L178 115 L216 200" stroke="#1a1a1a" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <!-- right ear (chevron) -->
+  <g class="right-ear">
+    <path d="M296 200 L334 115 L372 200" stroke="#1a1a1a" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <!-- face: > prompt chevron -->
+  <path class="prompt" d="M178 270 L210 300 L178 330" stroke="#1a1a1a" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- face: _ underscore -->
+  <line class="underscore" x1="230" y1="330" x2="285" y2="330" stroke="#1a1a1a" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- face: dot (cursor/eye) -->
+  <circle class="dot" cx="320" cy="300" r="10" fill="#1a1a1a"/>
+
+  <!-- left whiskers -->
+  <g class="left-whiskers">
+    <line x1="88" y1="268" x2="145" y2="278" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+    <line x1="85" y1="300" x2="145" y2="300" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+    <line x1="88" y1="332" x2="145" y2="322" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+  </g>
+
+  <!-- right whiskers -->
+  <g class="right-whiskers">
+    <line x1="424" y1="268" x2="367" y2="278" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+    <line x1="427" y1="300" x2="367" y2="300" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+    <line x1="424" y1="332" x2="367" y2="322" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>

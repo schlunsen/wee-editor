@@ -1,0 +1,346 @@
+/**
+ * Message Responsive Design
+ * Media queries and responsive styling for different screen sizes
+ */
+
+// Tablet breakpoint
+@media (max-width: 1024px) {
+  .message.user .message-content {
+    margin-left: 40px;
+  }
+
+  .message.assistant .message-content {
+    margin-right: 40px;
+  }
+
+  .message.user .message-images {
+    margin-left: 40px;
+  }
+
+  .message.assistant .message-images {
+    margin-right: 40px;
+  }
+
+  .message.assistant .thinking-section {
+    margin-right: 40px;
+  }
+
+  .message-image {
+    max-width: 280px;
+    max-height: 280px;
+  }
+}
+
+// Mobile breakpoint
+@media (max-width: 768px) {
+  .message {
+    margin-left: -4px;
+    margin-right: -4px;
+    padding: 4px;
+  }
+
+  .message.user .message-content {
+    margin-left: 24px;
+  }
+
+  .message.assistant .message-content {
+    margin-right: 24px;
+  }
+
+  .message.user .message-images {
+    margin-left: 24px;
+  }
+
+  .message.assistant .message-images {
+    margin-right: 24px;
+  }
+
+  .message-content {
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+
+  .message-header {
+    font-size: 0.85rem;
+    gap: 8px;
+  }
+
+  .message-role {
+    font-size: 0.85rem;
+  }
+
+  .message-time {
+    font-size: 0.75rem;
+  }
+
+  .message-image {
+    max-width: 200px;
+    max-height: 200px;
+  }
+
+  .message-images.grid-2 .message-image {
+    max-width: calc(50% - 6px);
+  }
+
+  .message-images.grid-3 .message-image {
+    max-width: calc(50% - 6px);
+  }
+
+  .tool-use {
+    font-size: 0.8rem;
+    padding: 3px 10px;
+    gap: 4px;
+
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+  }
+
+  .tool-detail {
+    max-width: 150px;
+  }
+
+  .thinking-section {
+    margin-right: 24px;
+  }
+
+  .thinking-toggle {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    gap: 6px;
+  }
+
+  .thinking-content {
+    padding: 10px 12px;
+  }
+
+  .thinking-text {
+    font-size: 0.85rem;
+  }
+}
+
+// Small mobile breakpoint
+@media (max-width: 480px) {
+  .message-content {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+
+  .message.user .message-content {
+    margin-left: 16px;
+  }
+
+  .message.assistant .message-content {
+    margin-right: 16px;
+  }
+
+  .message.user .message-images {
+    margin-left: 16px;
+  }
+
+  .message.assistant .message-images {
+    margin-right: 16px;
+  }
+
+  .message-images {
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .message-image {
+    max-width: 100%;
+    max-height: 200px;
+  }
+
+  .message-images.grid-2 .message-image {
+    max-width: calc(100% - 4px);
+  }
+
+  .message-images.grid-3 .message-image {
+    max-width: calc(100% - 4px);
+  }
+
+  .message-role {
+    font-size: 0.8rem;
+  }
+
+  .message-time {
+    font-size: 0.7rem;
+  }
+
+  .message-header {
+    gap: 6px;
+  }
+
+  .tool-uses {
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .tool-use {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    gap: 3px;
+  }
+
+  .tool-detail {
+    display: none;
+  }
+
+  .thinking-toggle {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+
+  .thinking-section {
+    margin-right: 16px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+
+  .thinking-content {
+    padding: 8px 10px;
+  }
+
+  .thinking-text {
+    font-size: 0.8rem;
+  }
+
+  // Reduce margins for space
+  .message {
+    margin-bottom: 16px;
+    padding: 4px;
+  }
+}
+
+// Ultra-small screens (portrait phones)
+@media (max-width: 360px) {
+  .message-content {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+
+  .message.user .message-content {
+    margin-left: 12px;
+  }
+
+  .message.assistant .message-content {
+    margin-right: 12px;
+  }
+
+  .click-hint-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .message-image {
+    max-width: 150px;
+    max-height: 150px;
+  }
+
+  .message-role {
+    font-size: 0.75rem;
+  }
+
+  .tool-use {
+    font-size: 0.7rem;
+    padding: 1px 6px;
+  }
+
+  .tool-uses {
+    gap: 4px;
+  }
+}
+
+// Landscape orientation on mobile
+@media (max-width: 768px) and (orientation: landscape) {
+  .message {
+    margin-bottom: 8px;
+  }
+
+  .message-header {
+    gap: 8px;
+  }
+
+  .message-content {
+    padding: 8px 12px;
+    margin-bottom: 4px;
+  }
+
+  .message-image {
+    max-width: 250px;
+    max-height: 150px;
+  }
+
+  .tool-uses {
+    margin-top: 4px;
+  }
+
+  .thinking-section {
+    margin-top: 6px;
+    margin-bottom: 6px;
+  }
+}
+
+// Dark theme specific responsive adjustments
+@media (prefers-color-scheme: dark) {
+  // Ensure contrast is maintained on dark backgrounds
+  .message-content :deep(code) {
+    background: rgba(var(--accent-purple-rgb, 139, 92, 246), 0.2);
+  }
+}
+
+// High contrast mode
+@media (prefers-contrast: more) {
+  .message {
+    border: 1px solid transparent;
+
+    &:focus {
+      outline: 3px solid var(--accent-purple);
+      outline-offset: 2px;
+    }
+  }
+
+  .tool-use.clickable {
+    border: 1px solid var(--accent-purple);
+
+    &:hover {
+      border: 1px solid white;
+    }
+  }
+}
+
+// Print styles
+@media print {
+  .message {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .message:hover {
+    background-color: transparent;
+  }
+
+  .click-hint-icon {
+    display: none;
+  }
+
+  .thinking-toggle {
+    display: none;
+  }
+
+  .tool-use.clickable {
+    cursor: default;
+    border: 1px solid var(--border-color);
+
+    &:hover {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      transform: none;
+      box-shadow: none;
+    }
+  }
+}

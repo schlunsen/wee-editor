@@ -1,0 +1,162 @@
+/**
+ * Thinking Section Styles
+ * Styling for collapsible thinking content with animations
+ */
+
+.thinking-section {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.thinking-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+
+  &:hover {
+    background: var(--card-bg);
+    border-color: var(--accent-purple);
+    color: var(--text-primary);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.thinking-toggle .brain-icon {
+  color: var(--accent-purple);
+  flex-shrink: 0;
+}
+
+.thinking-toggle .chevron {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+  transform: rotate(0deg);
+
+  &.expanded {
+    transform: rotate(90deg);
+  }
+}
+
+.thinking-toggle span {
+  flex: 1;
+  text-align: left;
+}
+
+.thinking-content {
+  margin-top: 8px;
+  background: rgba(var(--accent-purple-rgb, 139, 92, 246), 0.05);
+  border: 1px solid rgba(var(--accent-purple-rgb, 139, 92, 246), 0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  animation: thinkingExpand 0.2s ease-out;
+}
+
+@keyframes thinkingExpand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.thinking-text {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  font-style: italic;
+  opacity: 0.9;
+
+  // Code styling
+  :deep(code) {
+    background: rgba(var(--accent-purple-rgb, 139, 92, 246), 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.9em;
+    font-style: normal;
+  }
+
+  // Code block styling
+  :deep(pre) {
+    background: rgba(var(--accent-purple-rgb, 139, 92, 246), 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 8px 0;
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-style: normal;
+  }
+
+  // Paragraph styling
+  :deep(p) {
+    margin: 8px 0;
+
+    &:first-child {
+      margin-top: 0;
+    }
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  // List styling
+  :deep(ul),
+  :deep(ol) {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+  }
+
+  :deep(li) {
+    margin: 0.25rem 0;
+  }
+
+  // Header styling
+  :deep(h1),
+  :deep(h2),
+  :deep(h3) {
+    margin: 0.5rem 0;
+    color: var(--accent-purple);
+    font-weight: 600;
+  }
+
+  :deep(h1) {
+    font-size: 1rem;
+  }
+
+  :deep(h2) {
+    font-size: 0.95rem;
+  }
+
+  :deep(h3) {
+    font-size: 0.9rem;
+  }
+
+  // Emphasis
+  :deep(strong) {
+    font-weight: 600;
+    font-style: normal;
+  }
+
+  :deep(em) {
+    color: var(--text-secondary);
+  }
+}

@@ -1,0 +1,125 @@
+# golangci-lint configuration
+# Documentation: https://golangci-lint.run/usage/configuration/
+
+version: 2
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    # Only enable essential linters that catch real bugs
+    - govet         # Vet examines Go source code
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Static analysis (includes gosimple)
+
+  disable:
+    # Disabled linters that are too noisy or opinionated
+    - errcheck      # Too noisy for defer cleanup patterns
+    - gosec         # Too many false positives
+    - revive        # Too opinionated
+    - gocritic      # Too opinionated
+    - unused        # Too aggressive
+    - unconvert     # Minor issues
+    - unparam       # Minor issues
+    - prealloc      # Minor optimizations
+    - misspell      # Low priority
+    - nolintlint    # Low priority
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+    exclude-functions:
+      - (*database.DB).Close
+      - (*os.File).Close
+      - (io.Closer).Close
+
+  govet:
+    enable-all: true
+
+  revive:
+    severity: warning
+    rules:
+      - name: exported
+        severity: warning
+        disabled: false
+      - name: var-naming
+        severity: warning
+        disabled: false
+      - name: package-comments
+        severity: warning
+        disabled: true  # Not all packages need comments
+
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G104  # Audit errors not checked (too noisy)
+      - G304  # File path from variable (common pattern)
+
+  gocritic:
+    enabled-checks:
+      - appendAssign
+      - argOrder
+      - badCond
+      - caseOrder
+      - dupArg
+      - dupBranchBody
+      - dupCase
+      - emptyFallthrough
+      - equalFold
+      - flagDeref
+      - nilValReturn
+      - regexpMust
+      - sloppyLen
+      - weakCond
+
+  misspell:
+    locale: US
+
+  unparam:
+    check-exported: false
+
+issues:
+  exclude-use-default: false
+  exclude-dirs:
+    - vendor
+    - website/node_modules
+    - internal/server/frontend/node_modules
+  exclude-rules:
+    # Exclude some linters from running on tests
+    - path: _test\.go
+      linters:
+        - gosec
+        - dupl
+        - gocritic
+        - errcheck  # Allow unchecked errors in tests for cleanup operations
+
+    # Exclude some staticcheck messages
+    - linters:
+        - staticcheck
+      text: "SA9003:"  # Empty branch
+
+    # Exclude lll issues for long lines with go:generate
+    - linters:
+        - lll
+      source: "^//go:generate "
+
+    # Disable certain checks for embed directives
+    - path: ".*\\.go"
+      text: "embed"
+      linters:
+        - typecheck
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  formats:
+    colored-line-number:
+      path: stdout
+  sort-results: true
+  print-issued-lines: true
+  print-linter-name: true

@@ -1,0 +1,93 @@
+/* Neon Dark Theme - Cyberpunk vibes */
+[data-theme="neon-dark"] {
+  --bg-primary: #0d0221;
+  --bg-secondary: #1a0938;
+  --bg-tertiary: #240f4f;
+  --text-primary: #e0e0ff;
+  --text-secondary: #b8b8ff;
+  --text-muted: #7a7aaa;
+  --accent-purple: #d946ef;
+  --accent-cyan: #00ffff;
+  --accent-green: #39ff14;
+  --accent-yellow: #ffff00;
+  --accent-orange: #ff6600;
+  --border-color: #4a148c;
+  --code-bg: #1a0938;
+  --card-bg: #240f4f;
+  --card-hover: #33177a;
+  --status-success: #39ff14;
+  --status-warning: #ffff00;
+  --status-error: #ff0055;
+
+  /* Context Progress Bar Colors */
+  --progress-start: #00ffff;      /* Cyan - 0-25% */
+  --progress-low: #d946ef;        /* Purple - 25-50% */
+  --progress-medium: #ffff00;     /* Yellow - 50-75% */
+  --progress-high: #ff0055;       /* Red - 75-100% */
+
+  /* Theme-aware overlay colors */
+  --overlay-text: rgba(224, 224, 255, 0.6);
+  --overlay-text-hover: rgba(224, 224, 255, 0.8);
+  --overlay-text-active: #e0e0ff;
+  --overlay-bg: rgba(224, 224, 255, 0.05);
+  --overlay-bg-hover: rgba(224, 224, 255, 0.08);
+  --overlay-bg-active: rgba(224, 224, 255, 0.1);
+  --overlay-border: rgba(224, 224, 255, 0.1);
+  --overlay-border-hover: rgba(224, 224, 255, 0.2);
+  --overlay-divider: rgba(224, 224, 255, 0.15);
+  --header-bg: rgba(0, 0, 0, 0.2);
+  --header-border: rgba(224, 224, 255, 0.1);
+  --badge-bg: rgba(224, 224, 255, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* Typography - Futuristic cyberpunk font */
+  --font-primary: 'Orbitron', 'Inter', sans-serif;
+  --font-mono: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
+}
+
+/* Neon Light Theme - Bright neon accents */
+[data-theme="neon-light"] {
+  --bg-primary: #f8f8ff;
+  --bg-secondary: #e8e8ff;
+  --bg-tertiary: #ffffff;
+  --text-primary: #1a0938;
+  --text-secondary: #4a148c;
+  --text-muted: #7a7aaa;
+  --accent-purple: #b026ff;
+  --accent-cyan: #00cccc;
+  --accent-green: #00cc00;
+  --accent-yellow: #cccc00;
+  --accent-orange: #ff5500;
+  --border-color: #d0d0ff;
+  --code-bg: #e8e8ff;
+  --card-bg: #ffffff;
+  --card-hover: #f0f0ff;
+  --status-success: #00cc00;
+  --status-warning: #cccc00;
+  --status-error: #ff0044;
+
+  /* Context Progress Bar Colors */
+  --progress-start: #00cccc;      /* Cyan - 0-25% */
+  --progress-low: #b026ff;        /* Purple - 25-50% */
+  --progress-medium: #cccc00;     /* Yellow - 50-75% */
+  --progress-high: #ff0044;       /* Red - 75-100% */
+
+  /* Theme-aware overlay colors (light) */
+  --overlay-text: rgba(26, 9, 56, 0.55);
+  --overlay-text-hover: rgba(26, 9, 56, 0.7);
+  --overlay-text-active: #1a0938;
+  --overlay-bg: rgba(26, 9, 56, 0.04);
+  --overlay-bg-hover: rgba(26, 9, 56, 0.06);
+  --overlay-bg-active: rgba(26, 9, 56, 0.08);
+  --overlay-border: rgba(26, 9, 56, 0.1);
+  --overlay-border-hover: rgba(26, 9, 56, 0.2);
+  --overlay-divider: rgba(26, 9, 56, 0.12);
+  --header-bg: rgba(26, 9, 56, 0.03);
+  --header-border: rgba(26, 9, 56, 0.1);
+  --badge-bg: rgba(26, 9, 56, 0.08);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+
+  /* Typography - Futuristic cyberpunk font */
+  --font-primary: 'Orbitron', 'Inter', sans-serif;
+  --font-mono: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
+}

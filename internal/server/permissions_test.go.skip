@@ -1,0 +1,637 @@
+package server
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestPermissionEndpoints tests all permission management endpoints
+func TestPermissionEndpoints(t *testing.T) {
+	// Create temporary directory for test
+	tempDir := t.TempDir()
+
+	// Change to temp directory for testing
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(originalWd)
+
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+
+	// Create .claude directory
+	claudeDir := filepath.Join(tempDir, ".claude")
+	err = os.MkdirAll(claudeDir, 0755)
+	require.NoError(t, err)
+
+	// Create a new Fiber app for testing
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			return c.Status(500).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		},
+	})
+
+	// Create a minimal server instance
+	server := &Server{
+		app: app,
+	}
+
+	// Setup routes
+	api := app.Group("/api")
+	api.Get("/config/permissions", server.handleGetProjectPermissions)
+	api.Post("/config/permissions", server.handleAddPermission)
+	api.Delete("/config/permissions", server.handleDeletePermission)
+	api.Put("/config/permissions", server.handleUpdatePermissions)
+
+	t.Run("GET permissions - empty file", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/config/permissions", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.Equal(t, float64(0), result["total"])
+		assert.NotNil(t, result["categories"])
+		assert.NotNil(t, result["file_path"])
+	})
+
+	t.Run("POST add permission - valid", func(t *testing.T) {
+		payload := map[string]string{
+			"permission": "Bash(git:*)",
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("POST", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.True(t, result["success"].(bool))
+		assert.Equal(t, float64(1), result["total"])
+		assert.Contains(t, result, "categories")
+
+		// Verify bash category exists
+		categories := result["categories"].(map[string]interface{})
+		assert.NotNil(t, categories["bash"])
+	})
+
+	t.Run("POST add permission - invalid format", func(t *testing.T) {
+		payload := map[string]string{
+			"permission": "invalid-format",
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("POST", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.Contains(t, result["error"], "Invalid permission format")
+	})
+
+	t.Run("POST add permission - empty", func(t *testing.T) {
+		payload := map[string]string{
+			"permission": "",
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("POST", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.Contains(t, result["error"], "cannot be empty")
+	})
+
+	t.Run("POST add multiple permissions", func(t *testing.T) {
+		permissions := []string{
+			"Bash(npm:*)",
+			"Read(**)",
+			"Write(**)",
+			"Edit(**)",
+			"Grep(*)",
+			"Glob(*)",
+			"WebFetch(*)",
+		}
+
+		for _, perm := range permissions {
+			payload := map[string]string{"permission": perm}
+			body, _ := json.Marshal(payload)
+
+			req := httptest.NewRequest("POST", "/api/config/permissions", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+			resp.Body.Close()
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+		}
+
+		// Verify all were added
+		req := httptest.NewRequest("GET", "/api/config/permissions", nil)
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		// Should have 8 permissions (git + 7 new ones)
+		assert.Equal(t, float64(8), result["total"])
+
+		categories := result["categories"].(map[string]interface{})
+		assert.NotNil(t, categories["bash"])
+		assert.NotNil(t, categories["read"])
+		assert.NotNil(t, categories["write"])
+		assert.NotNil(t, categories["edit"])
+		assert.NotNil(t, categories["grep"])
+		assert.NotNil(t, categories["glob"])
+		assert.NotNil(t, categories["webfetch"])
+	})
+
+	t.Run("POST add duplicate permission", func(t *testing.T) {
+		// Add same permission twice
+		payload := map[string]string{
+			"permission": "Bash(docker:*)",
+		}
+		body, _ := json.Marshal(payload)
+
+		// First add
+		req := httptest.NewRequest("POST", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		// Second add (duplicate)
+		req = httptest.NewRequest("POST", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err = app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		// Verify count didn't increase (deduplication)
+		req = httptest.NewRequest("GET", "/api/config/permissions", nil)
+		resp, err = app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		// Should still be 9 permissions (not 10)
+		assert.Equal(t, float64(9), result["total"])
+	})
+
+	t.Run("DELETE permission - valid", func(t *testing.T) {
+		payload := map[string]string{
+			"permission": "Bash(git:*)",
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("DELETE", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.True(t, result["success"].(bool))
+		assert.Contains(t, result["message"], "removed successfully")
+
+		// Verify count decreased
+		assert.Equal(t, float64(8), result["total"])
+	})
+
+	t.Run("DELETE permission - not found", func(t *testing.T) {
+		payload := map[string]string{
+			"permission": "Bash(nonexistent:*)",
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("DELETE", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.Contains(t, result["error"], "not found")
+	})
+
+	t.Run("DELETE permission - empty", func(t *testing.T) {
+		payload := map[string]string{
+			"permission": "",
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("DELETE", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.Contains(t, result["error"], "cannot be empty")
+	})
+
+	t.Run("PUT update permissions - bulk replace", func(t *testing.T) {
+		newPermissions := []string{
+			"Bash(git:*)",
+			"Bash(make:*)",
+			"Read(**)",
+			"Edit(**)",
+		}
+
+		payload := map[string]interface{}{
+			"permissions": newPermissions,
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("PUT", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.True(t, result["success"].(bool))
+		assert.Equal(t, float64(4), result["total"])
+
+		categories := result["categories"].(map[string]interface{})
+		assert.NotNil(t, categories["bash"])
+		assert.NotNil(t, categories["read"])
+		assert.NotNil(t, categories["edit"])
+		assert.Nil(t, categories["write"]) // Should be removed
+	})
+
+	t.Run("PUT update permissions - invalid format", func(t *testing.T) {
+		newPermissions := []string{
+			"Bash(git:*)",
+			"invalid-format",
+		}
+
+		payload := map[string]interface{}{
+			"permissions": newPermissions,
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("PUT", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.Contains(t, result["error"], "Invalid permission format")
+	})
+
+	t.Run("PUT update permissions - empty array", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"permissions": []string{},
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("PUT", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var result map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+
+		assert.Equal(t, float64(0), result["total"])
+	})
+}
+
+// TestCategorizePermissions tests the categorization logic
+func TestCategorizePermissions(t *testing.T) {
+	tests := []struct {
+		name        string
+		permissions []string
+		expected    map[string]int
+	}{
+		{
+			name: "bash commands",
+			permissions: []string{
+				"Bash(git:*)",
+				"Bash(npm:*)",
+				"Bash(docker:*)",
+			},
+			expected: map[string]int{
+				"bash": 3,
+			},
+		},
+		{
+			name: "file operations",
+			permissions: []string{
+				"Read(**)",
+				"Write(**)",
+				"Edit(**)",
+			},
+			expected: map[string]int{
+				"read":  1,
+				"write": 1,
+				"edit":  1,
+			},
+		},
+		{
+			name: "search operations",
+			permissions: []string{
+				"Grep(*)",
+				"Glob(*)",
+			},
+			expected: map[string]int{
+				"grep": 1,
+				"glob": 1,
+			},
+		},
+		{
+			name: "web operations",
+			permissions: []string{
+				"WebFetch(*)",
+				"WebSearch(*)",
+			},
+			expected: map[string]int{
+				"webfetch":  1,
+				"websearch": 1,
+			},
+		},
+		{
+			name: "task operations",
+			permissions: []string{
+				"Task(*)",
+			},
+			expected: map[string]int{
+				"task": 1,
+			},
+		},
+		{
+			name: "mcp servers",
+			permissions: []string{
+				"mcp__server1__tool",
+				"mcp__server2__tool",
+			},
+			expected: map[string]int{
+				"mcp": 2,
+			},
+		},
+		{
+			name: "other/unknown",
+			permissions: []string{
+				"UnknownTool(*)",
+				"AnotherTool(**)",
+			},
+			expected: map[string]int{
+				"other": 2,
+			},
+		},
+		{
+			name: "mixed permissions",
+			permissions: []string{
+				"Bash(git:*)",
+				"Read(**)",
+				"Write(**)",
+				"Grep(*)",
+				"WebFetch(*)",
+				"Task(*)",
+				"mcp__test__tool",
+				"UnknownTool(*)",
+			},
+			expected: map[string]int{
+				"bash":     1,
+				"read":     1,
+				"write":    1,
+				"grep":     1,
+				"webfetch": 1,
+				"task":     1,
+				"mcp":      1,
+				"other":    1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := categorizePermissions(tt.permissions)
+
+			for category, expectedCount := range tt.expected {
+				categoryData, exists := result[category]
+				require.True(t, exists, "Category %s should exist", category)
+
+				// Handle fiber.Map type
+				var categoryMap map[string]interface{}
+				switch v := categoryData.(type) {
+				case fiber.Map:
+					categoryMap = map[string]interface{}(v)
+				case map[string]interface{}:
+					categoryMap = v
+				default:
+					t.Fatalf("Unexpected type for category %s: %T", category, categoryData)
+				}
+
+				count := int(categoryMap["count"].(int))
+				assert.Equal(t, expectedCount, count, "Category %s count mismatch", category)
+
+				permissions := categoryMap["permissions"].([]string)
+				assert.Equal(t, expectedCount, len(permissions), "Category %s permissions length mismatch", category)
+			}
+		})
+	}
+}
+
+// TestPermissionFileIntegrity tests file creation and integrity
+func TestPermissionFileIntegrity(t *testing.T) {
+	tempDir := t.TempDir()
+
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(originalWd)
+
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+
+	app := fiber.New()
+	server := &Server{app: app}
+
+	api := app.Group("/api")
+	api.Post("/config/permissions", server.handleAddPermission)
+
+	// Add a permission
+	payload := map[string]string{"permission": "Bash(git:*)"}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest("POST", "/api/config/permissions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	// Verify file was created
+	settingsPath := filepath.Join(tempDir, ".claude", "settings.local.json")
+	_, err = os.Stat(settingsPath)
+	assert.NoError(t, err, "Settings file should be created")
+
+	// Verify file permissions
+	info, err := os.Stat(settingsPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0644), info.Mode().Perm(), "File should have 0644 permissions")
+
+	// Verify file content
+	data, err := os.ReadFile(settingsPath)
+	require.NoError(t, err)
+
+	var settings map[string]interface{}
+	err = json.Unmarshal(data, &settings)
+	require.NoError(t, err)
+
+	permissions := settings["permissions"].(map[string]interface{})
+	allow := permissions["allow"].([]interface{})
+	assert.Equal(t, 1, len(allow))
+	assert.Equal(t, "Bash(git:*)", allow[0])
+}
+
+// TestConcurrentPermissionOperations tests concurrent add/delete
+func TestConcurrentPermissionOperations(t *testing.T) {
+	tempDir := t.TempDir()
+
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	defer os.Chdir(originalWd)
+
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+
+	// Create .claude directory
+	claudeDir := filepath.Join(tempDir, ".claude")
+	err = os.MkdirAll(claudeDir, 0755)
+	require.NoError(t, err)
+
+	app := fiber.New()
+	server := &Server{app: app}
+
+	api := app.Group("/api")
+	api.Post("/config/permissions", server.handleAddPermission)
+	api.Get("/config/permissions", server.handleGetProjectPermissions)
+
+	// Add permissions sequentially to avoid race conditions with file writes
+	// (ClaudeSettingsManager uses file locking internally)
+	permissions := []string{
+		"Bash(git:*)",
+		"Bash(npm:*)",
+		"Bash(docker:*)",
+		"Read(**)",
+		"Write(**)",
+		"Edit(**)",
+	}
+
+	for _, perm := range permissions {
+		payload := map[string]string{"permission": perm}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest("POST", "/api/config/permissions", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	}
+
+	// Verify all were added
+	req := httptest.NewRequest("GET", "/api/config/permissions", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var result map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+
+	total, ok := result["total"]
+	require.True(t, ok, "Result should contain 'total' field")
+	assert.Equal(t, float64(6), total, "Should have 6 permissions")
+}

@@ -1,0 +1,93 @@
+/* Dracula Dark Theme - Vibrant purple and pink */
+[data-theme="dracula-dark"] {
+  --bg-primary: #282a36;
+  --bg-secondary: #21222c;
+  --bg-tertiary: #343746;
+  --text-primary: #f8f8f2;
+  --text-secondary: #bfbfbf;
+  --text-muted: #6272a4;
+  --accent-purple: #bd93f9;
+  --accent-cyan: #8be9fd;
+  --accent-green: #50fa7b;
+  --accent-yellow: #f1fa8c;
+  --accent-orange: #ffb86c;
+  --border-color: #44475a;
+  --code-bg: #21222c;
+  --card-bg: #343746;
+  --card-hover: #44475a;
+  --status-success: #50fa7b;
+  --status-warning: #f1fa8c;
+  --status-error: #ff5555;
+
+  /* Context Progress Bar Colors */
+  --progress-start: #8be9fd;      /* Cyan - 0-25% */
+  --progress-low: #bd93f9;        /* Purple - 25-50% */
+  --progress-medium: #f1fa8c;     /* Yellow - 50-75% */
+  --progress-high: #ff5555;       /* Red - 75-100% */
+
+  /* Theme-aware overlay colors */
+  --overlay-text: rgba(248, 248, 242, 0.6);
+  --overlay-text-hover: rgba(248, 248, 242, 0.8);
+  --overlay-text-active: #f8f8f2;
+  --overlay-bg: rgba(248, 248, 242, 0.05);
+  --overlay-bg-hover: rgba(248, 248, 242, 0.08);
+  --overlay-bg-active: rgba(248, 248, 242, 0.1);
+  --overlay-border: rgba(248, 248, 242, 0.1);
+  --overlay-border-hover: rgba(248, 248, 242, 0.2);
+  --overlay-divider: rgba(248, 248, 242, 0.15);
+  --header-bg: rgba(0, 0, 0, 0.2);
+  --header-border: rgba(248, 248, 242, 0.1);
+  --badge-bg: rgba(248, 248, 242, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* Typography - Professional coding font */
+  --font-primary: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+/* Dracula Light Theme - Soft pastels */
+[data-theme="dracula-light"] {
+  --bg-primary: #f8f8f2;
+  --bg-secondary: #eff0eb;
+  --bg-tertiary: #ffffff;
+  --text-primary: #282a36;
+  --text-secondary: #44475a;
+  --text-muted: #6272a4;
+  --accent-purple: #9580ff;
+  --accent-cyan: #66d9ef;
+  --accent-green: #3dd68d;
+  --accent-yellow: #e6db74;
+  --accent-orange: #ff9500;
+  --border-color: #d6d7d0;
+  --code-bg: #eff0eb;
+  --card-bg: #ffffff;
+  --card-hover: #f9f9f6;
+  --status-success: #3dd68d;
+  --status-warning: #e6db74;
+  --status-error: #ff4444;
+
+  /* Context Progress Bar Colors */
+  --progress-start: #66d9ef;      /* Cyan - 0-25% */
+  --progress-low: #9580ff;        /* Purple - 25-50% */
+  --progress-medium: #e6db74;     /* Yellow - 50-75% */
+  --progress-high: #ff4444;       /* Red - 75-100% */
+
+  /* Theme-aware overlay colors (light) */
+  --overlay-text: rgba(40, 42, 54, 0.55);
+  --overlay-text-hover: rgba(40, 42, 54, 0.7);
+  --overlay-text-active: #282a36;
+  --overlay-bg: rgba(40, 42, 54, 0.04);
+  --overlay-bg-hover: rgba(40, 42, 54, 0.06);
+  --overlay-bg-active: rgba(40, 42, 54, 0.08);
+  --overlay-border: rgba(40, 42, 54, 0.1);
+  --overlay-border-hover: rgba(40, 42, 54, 0.2);
+  --overlay-divider: rgba(40, 42, 54, 0.12);
+  --header-bg: rgba(40, 42, 54, 0.03);
+  --header-border: rgba(40, 42, 54, 0.1);
+  --badge-bg: rgba(40, 42, 54, 0.08);
+  --shadow-color: rgba(0, 0, 0, 0.1);
+
+  /* Typography - Professional coding font */
+  --font-primary: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+}

@@ -1,0 +1,53 @@
+/**
+ * Message Base Styles
+ * Core message container styling, spacing, and transitions
+ */
+
+.message {
+  margin-bottom: 24px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  padding: 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+  border-radius: 12px;
+
+  &:hover {
+    background-color: rgba(var(--accent-purple-rgb, 139, 92, 246), 0.05);
+  }
+
+  &:active {
+    transform: scale(0.995);
+  }
+
+  &:focus {
+    outline: 2px solid var(--accent-purple);
+    outline-offset: 2px;
+  }
+}
+
+// Message status classes
+.message.isHistorical {
+  opacity: 0.8;
+}
+
+.message.isToolResult {
+  // Styling handled in message-content
+}
+
+.message.isExecutionStatus {
+  // Styling handled in message-content
+}
+
+.message.isPermissionDecision {
+  // Styling handled in message-content
+}
+
+.message.isError {
+  // Styling handled in message-roles
+}
+
+// Prevent click bubbling
+.message .no-click-bubble {
+  // Used for edit diffs in non-historical messages
+}

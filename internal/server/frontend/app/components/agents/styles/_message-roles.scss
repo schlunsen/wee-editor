@@ -1,0 +1,136 @@
+/**
+ * Message Role Styles
+ * Styling specific to message roles (user, assistant, system, error)
+ */
+
+// User message styling
+.message.user {
+  .message-content {
+    background: var(--accent-purple);
+    color: white;
+    border-color: var(--accent-purple);
+    margin-left: 48px;
+
+    :deep(code) {
+      background: var(--overlay-border-hover);
+    }
+
+    :deep(.message-link) {
+      color: var(--overlay-text-active);
+      text-decoration: underline;
+
+      &:hover {
+        color: white;
+        text-decoration: none;
+      }
+    }
+  }
+
+  .message-images {
+    margin-left: 48px;
+  }
+
+  .message-image {
+    border-color: var(--overlay-border-hover);
+  }
+
+  .thinking-section {
+    margin-right: 0;
+    margin-left: 48px;
+  }
+}
+
+// Assistant message styling
+.message.assistant {
+  .message-content {
+    margin-right: 48px;
+  }
+
+  .message-images {
+    margin-right: 48px;
+  }
+
+  .thinking-section {
+    margin-right: 48px;
+  }
+
+  .message-role {
+    color: var(--accent-purple);
+  }
+}
+
+// System message styling
+.message.system {
+  opacity: 0.85;
+
+  .message-content {
+    background: rgba(107, 114, 128, 0.1);
+    border-color: rgba(107, 114, 128, 0.2);
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .message-role {
+    color: var(--text-secondary);
+  }
+}
+
+// Error message styling
+.message.error,
+.message.isError {
+  .message-content {
+    background: rgba(220, 53, 69, 0.1);
+    border-color: rgba(220, 53, 69, 0.3);
+    color: #dc3545;
+  }
+
+  .message-role {
+    color: #dc3545;
+    font-weight: 600;
+  }
+}
+
+// SDK Error messages (role='error') - More prominent styling
+.message.error .message-content {
+  background: rgba(220, 53, 69, 0.15);
+  border: 2px solid rgba(220, 53, 69, 0.5);
+  border-radius: 8px;
+  color: #dc3545;
+  font-weight: 500;
+  padding: 12px 16px;
+}
+
+.message.error .message-role {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+// Tool result styling
+.message.isToolResult {
+  .message-content {
+    background: var(--bg-secondary);
+    border-left: 3px solid var(--accent-purple);
+    font-family: monospace;
+    font-size: 0.85rem;
+  }
+}
+
+// Execution status styling
+.message.isExecutionStatus {
+  .message-content {
+    background: rgba(var(--accent-purple-rgb, 139, 92, 246), 0.1);
+    border-left: 3px solid var(--accent-purple);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+}
+
+// Permission decision styling
+.message.isPermissionDecision {
+  .message-content {
+    background: rgba(34, 197, 94, 0.1);
+    border-left: 3px solid #22c55e;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+}

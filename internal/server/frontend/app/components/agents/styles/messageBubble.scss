@@ -1,0 +1,29 @@
+/**
+ * MessageBubble Component Styles
+ * Main entry point for all message bubble styles
+ * Imports modular SCSS files for different aspects
+ */
+
+// Base styles and animations
+@import './message-base';
+
+// Role-specific styling
+@import './message-roles';
+
+// Content area styling
+@import './message-content';
+
+// Header styling
+@import './message-header';
+
+// Thinking section styling
+@import './message-thinking';
+
+// Tool indicators styling
+@import './message-tools';
+
+// Image gallery styling
+@import './message-images';
+
+// Responsive design
+@import './message-responsive';

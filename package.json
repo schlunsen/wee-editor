@@ -1,0 +1,12 @@
+{
+  "name": "wee-desktop",
+  "version": "1.14.0",
+  "private": true,
+  "scripts": {
+    "tauri": "cargo tauri",
+    "tauri:dev": "cargo tauri dev",
+    "tauri:build": "npm run tauri:build-sidecar && cargo tauri build",
+    "tauri:build-sidecar": "node src-tauri/scripts/build-sidecar.mjs",
+    "tauri:setup": "bash src-tauri/scripts/setup.sh"
+  }
+}

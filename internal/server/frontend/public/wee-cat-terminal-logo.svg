@@ -1,0 +1,36 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    @keyframes blink {
+      0%, 90%, 100% { opacity: 1; }
+      95% { opacity: 0; }
+    }
+    .cursor { animation: blink 4s ease-in-out infinite; }
+  </style>
+
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="#F5F5F7"/>
+
+  <!-- left ear (chevron) -->
+  <path d="M140 200 L178 115 L216 200" stroke="#1a1a1a" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- right ear (chevron) -->
+  <path d="M296 200 L334 115 L372 200" stroke="#1a1a1a" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- face: > prompt chevron -->
+  <path d="M178 270 L210 300 L178 330" stroke="#1a1a1a" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- face: _ underscore -->
+  <line x1="230" y1="330" x2="285" y2="330" stroke="#1a1a1a" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- face: dot (cursor/eye) - blinks! -->
+  <circle class="cursor" cx="320" cy="300" r="10" fill="#1a1a1a"/>
+
+  <!-- left whiskers -->
+  <line x1="88" y1="268" x2="145" y2="278" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+  <line x1="85" y1="300" x2="145" y2="300" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+  <line x1="88" y1="332" x2="145" y2="322" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- right whiskers -->
+  <line x1="424" y1="268" x2="367" y2="278" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+  <line x1="427" y1="300" x2="367" y2="300" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+  <line x1="424" y1="332" x2="367" y2="322" stroke="#1a1a1a" stroke-width="10" stroke-linecap="round"/>
+</svg>

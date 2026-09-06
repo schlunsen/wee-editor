@@ -1,0 +1,34 @@
+/**
+ * Message Header Styles
+ * Styling for message role name, timestamp, and info icons
+ */
+
+.message-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.message-role {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.message-time {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.click-hint-icon {
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 0.2s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.message:hover .click-hint-icon {
+  opacity: 0.5;
+}

@@ -9,7 +9,7 @@
 withDefaults(defineProps<{
   command?: string
 }>(), {
-  command: 'brew install schlunsen/wee/wee'
+  command: 'brew install schlunsen/wee-editor/wee'
 })
 </script>
 

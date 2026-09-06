@@ -19,7 +19,7 @@ import (
 const (
 	// DefaultRegistryURL is the default URL for the remote model registry.
 	// This can be hosted on GitHub Pages, a CDN, or any static file host.
-	DefaultRegistryURL = "https://schlunsen.github.io/claude-control-terminal/models-registry.json"
+	DefaultRegistryURL = "https://schlunsen.github.io/wee-editor/models-registry.json"
 
 	// registryCacheFile is the local cache filename stored in the claude config dir
 	registryCacheFile = "models-registry.json"

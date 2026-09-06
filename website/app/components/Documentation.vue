@@ -16,19 +16,19 @@
     <div class="resources">
       <h3 class="subsection-title">> resources</h3>
       <div class="resource-links">
-        <a href="https://github.com/schlunsen/wee" class="card resource-link" target="_blank">
+        <a href="https://github.com/schlunsen/wee-editor" class="card resource-link" target="_blank">
           GitHub Repository
         </a>
-        <a href="https://github.com/schlunsen/wee/blob/main/README.md" class="card resource-link" target="_blank">
+        <a href="https://github.com/schlunsen/wee-editor/blob/main/README.md" class="card resource-link" target="_blank">
           Full Documentation
         </a>
-        <a href="https://github.com/schlunsen/wee/blob/main/CONTRIBUTING.md" class="card resource-link" target="_blank">
+        <a href="https://github.com/schlunsen/wee-editor/blob/main/CONTRIBUTING.md" class="card resource-link" target="_blank">
           Contributing Guide
         </a>
-        <a href="https://github.com/schlunsen/wee/releases" class="card resource-link" target="_blank">
+        <a href="https://github.com/schlunsen/wee-editor/releases" class="card resource-link" target="_blank">
           Releases
         </a>
-        <a href="https://github.com/schlunsen/wee/issues" class="card resource-link" target="_blank">
+        <a href="https://github.com/schlunsen/wee-editor/issues" class="card resource-link" target="_blank">
           Issues
         </a>
       </div>
@@ -48,7 +48,7 @@ const docs = [
       'MCP server integrations',
       'Smart category search'
     ],
-    link: 'https://github.com/schlunsen/wee#component-installation'
+    link: 'https://github.com/schlunsen/wee-editor#component-installation'
   },
   {
     icon: '🔄',
@@ -61,7 +61,7 @@ const docs = [
       'Kimi (Moonshot AI)',
       'Custom providers'
     ],
-    link: 'https://github.com/schlunsen/wee#ai-provider-configuration'
+    link: 'https://github.com/schlunsen/wee-editor#ai-provider-configuration'
   },
   {
     icon: '⚙️',
@@ -73,7 +73,7 @@ const docs = [
       'Bash command permissions',
       'Web access control'
     ],
-    link: 'https://github.com/schlunsen/wee#permissions-management'
+    link: 'https://github.com/schlunsen/wee-editor#permissions-management'
   },
   {
     icon: '🐳',
@@ -85,7 +85,7 @@ const docs = [
       'MCP integration in containers',
       'Production-ready setups'
     ],
-    link: 'https://github.com/schlunsen/wee#docker-support'
+    link: 'https://github.com/schlunsen/wee-editor#docker-support'
   },
   {
     icon: '📊',
@@ -97,7 +97,7 @@ const docs = [
       'System statistics',
       'REST API endpoints'
     ],
-    link: 'https://github.com/schlunsen/wee#analytics-dashboard'
+    link: 'https://github.com/schlunsen/wee-editor#analytics-dashboard'
   },
   {
     icon: '🧪',
@@ -109,7 +109,7 @@ const docs = [
       'GitHub Actions CI/CD',
       'Make and Just build tools'
     ],
-    link: 'https://github.com/schlunsen/wee/blob/main/TESTING.md'
+    link: 'https://github.com/schlunsen/wee-editor/blob/main/TESTING.md'
   }
 ]
 </script>

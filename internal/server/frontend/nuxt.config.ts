@@ -257,13 +257,13 @@ export default defineNuxtConfig({
               );
 
               console.log(
-                '%c🛠️  GitHub:%c https://github.com/schlunsen/wee',
+                '%c🛠️  GitHub:%c https://github.com/schlunsen/wee-editor',
                 'color: #0088aa; font-weight: bold; font-size: 13px;',
                 'color: #00ffff; text-decoration: underline; font-size: 13px;'
               );
 
               console.log(
-                '%c📖 Docs:%c https://schlunsen.github.io/wee/',
+                '%c📖 Docs:%c https://schlunsen.github.io/wee-editor/',
                 'color: #0088aa; font-weight: bold; font-size: 13px; padding-left: 6px;',
                 'color: #00ffff; text-decoration: underline; font-size: 13px;'
               );

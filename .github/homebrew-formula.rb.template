@@ -1,24 +1,24 @@
 class Wee < Formula
   desc "Wee - Control center and wrapper for Claude Code"
-  homepage "https://github.com/schlunsen/wee"
+  homepage "https://github.com/schlunsen/wee-editor"
   version "{{VERSION}}"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/schlunsen/wee/releases/download/v{{VERSION}}/wee-darwin-arm64.tar.gz"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v{{VERSION}}/wee-darwin-arm64.tar.gz"
       sha256 "{{SHA256_DARWIN_ARM64}}"
     else
-      url "https://github.com/schlunsen/wee/releases/download/v{{VERSION}}/wee-darwin-amd64.tar.gz"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v{{VERSION}}/wee-darwin-amd64.tar.gz"
       sha256 "{{SHA256_DARWIN_AMD64}}"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/schlunsen/wee/releases/download/v{{VERSION}}/wee-linux-arm64"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v{{VERSION}}/wee-linux-arm64"
       sha256 "{{SHA256_LINUX_ARM64}}"
     else
-      url "https://github.com/schlunsen/wee/releases/download/v{{VERSION}}/wee-linux-amd64"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v{{VERSION}}/wee-linux-amd64"
       sha256 "{{SHA256_LINUX_AMD64}}"
     end
   end

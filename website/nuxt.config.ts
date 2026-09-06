@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   ssr: false,
 
   app: {
-    baseURL: '/wee/',
+    baseURL: '/wee-editor/',
     head: {
       title: 'Wee',
       meta: [
@@ -34,7 +34,7 @@ export default defineNuxtConfig({
         { name: 'twitter:image:alt', content: 'wee.cat - The coolest cats code in sandboxes' }
       ],
       link: [
-        { rel: 'icon', type: 'image/x-icon', href: '/wee/favicon.ico' },
+        { rel: 'icon', type: 'image/x-icon', href: '/wee-editor/favicon.ico' },
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap' }

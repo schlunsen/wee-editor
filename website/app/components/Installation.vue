@@ -64,13 +64,13 @@ const installMethods = [
     icon: '🍺',
     title: 'Homebrew (macOS/Linux)',
     description: 'Recommended for macOS and Linux users',
-    command: 'brew install schlunsen/wee/wee'
+    command: 'brew install schlunsen/wee-editor/wee'
   },
   {
     icon: '📦',
     title: 'Download Binary',
     description: 'Pre-built binaries for all platforms',
-    command: `curl -L https://github.com/schlunsen/wee/releases/latest/download/wee-<platform>-<arch> -o wee
+    command: `curl -L https://github.com/schlunsen/wee-editor/releases/latest/download/wee-<platform>-<arch> -o wee
 chmod +x wee
 sudo mv wee /usr/local/bin/`
   },
@@ -78,13 +78,13 @@ sudo mv wee /usr/local/bin/`
     icon: '🔧',
     title: 'Install with Go',
     description: 'For Go developers',
-    command: 'go install github.com/schlunsen/wee/cmd/wee@latest'
+    command: 'go install github.com/schlunsen/wee-editor/cmd/wee@latest'
   },
   {
     icon: '⚙️',
     title: 'Build from Source',
     description: 'Build it yourself',
-    command: `git clone https://github.com/schlunsen/wee
+    command: `git clone https://github.com/schlunsen/wee-editor
 cd wee
 make build`
   }

@@ -2,7 +2,7 @@
 
 Please report suspected vulnerabilities privately. Do not include credentials, session exports, personal data, or exploit details in public issues.
 
-Use [GitHub private vulnerability reporting](https://github.com/schlunsen/wee/security/advisories/new) when available. If GitHub does not offer that option, open an issue requesting a private contact channel without disclosing the vulnerability.
+Use [GitHub private vulnerability reporting](https://github.com/schlunsen/wee-editor/security/advisories/new) when available. If GitHub does not offer that option, open an issue requesting a private contact channel without disclosing the vulnerability.
 
 Include the affected version, reproduction steps using synthetic data, expected and actual behavior, and the potential impact. Remove secrets from logs and screenshots before sharing them.
 

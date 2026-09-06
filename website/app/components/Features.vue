@@ -83,85 +83,85 @@ const providers = [
 const features = [
   {
     icon: '🎮',
-    iconImg: '/wee/images/icon-control-center.png',
+    iconImg: '/wee-editor/images/icon-control-center.png',
     title: 'Control Center',
     description: 'Comprehensive wrapper for managing Claude Code environments'
   },
   {
     icon: '🤖',
-    iconImg: '/wee/images/icon-live-agents.png',
+    iconImg: '/wee-editor/images/icon-live-agents.png',
     title: 'Live Agents Dashboard',
     description: 'Real-time Claude agent conversations with WebSocket streaming, session metrics, and tool tracking'
   },
   {
     icon: '🔌',
-    iconImg: '/wee/images/icon-mcp.png',
+    iconImg: '/wee-editor/images/icon-mcp.png',
     title: 'MCP Server Integration',
     description: 'Extend Claude with Model Context Protocol servers for custom tools and resources'
   },
   {
     icon: '🎨',
-    iconImg: '/wee/images/icon-themes.png',
+    iconImg: '/wee-editor/images/icon-themes.png',
     title: 'Multiple Themes',
     description: 'Choose from 5 theme families: Default, Neon, Nord, Dracula, and South Park'
   },
   {
     icon: '⌨️',
-    iconImg: '/wee/images/icon-keyboard.png',
+    iconImg: '/wee-editor/images/icon-keyboard.png',
     title: 'Keyboard Shortcuts',
     description: 'Global keyboard shortcuts for enhanced productivity and navigation (press \'?\' for help)'
   },
   {
     icon: '💾',
-    iconImg: '/wee/images/icon-session.png',
+    iconImg: '/wee-editor/images/icon-session.png',
     title: 'Session Persistence',
     description: 'SQLite-backed agent session storage with crash recovery and history loading'
   },
   {
     icon: '🧠',
-    iconImg: '/wee/images/icon-skills.png',
+    iconImg: '/wee-editor/images/icon-skills.png',
     title: 'Skills & Connectors',
     description: 'Reusable prompt packages and external service integrations for your agents'
   },
   {
     icon: '⚙️',
-    iconImg: '/wee/images/icon-permissions.png',
+    iconImg: '/wee-editor/images/icon-permissions.png',
     title: 'Permissions Management',
     description: 'Granular control over Claude Code tool permissions'
   },
   {
     icon: '🐳',
-    iconImg: '/wee/images/icon-docker.png',
+    iconImg: '/wee-editor/images/icon-docker.png',
     title: 'Docker Support',
     description: 'Containerize Claude environments with one command'
   },
   {
     icon: '📊',
-    iconImg: '/wee/images/icon-analytics.png',
+    iconImg: '/wee-editor/images/icon-analytics.png',
     title: 'Analytics Dashboard',
     description: 'Real-time WebSocket-based monitoring with process correlation'
   },
   {
     icon: '⚡',
-    iconImg: '/wee/images/icon-performance.png',
+    iconImg: '/wee-editor/images/icon-performance.png',
     title: 'High Performance',
     description: '50-100x faster than Node.js version, 5x lower memory'
   },
   {
     icon: '🔧',
-    iconImg: '/wee/images/icon-zero-deps.png',
+    iconImg: '/wee-editor/images/icon-zero-deps.png',
     title: 'Zero Dependencies',
     description: 'Single self-contained binary, no runtime needed'
   },
   {
     icon: '🌐',
-    iconImg: '/wee/images/icon-cross-platform.png',
+    iconImg: '/wee-editor/images/icon-cross-platform.png',
     title: 'Cross-Platform',
     description: 'Linux, macOS, Windows (amd64/arm64)'
   },
   {
     icon: '✅',
-    iconImg: '/wee/images/icon-well-tested.png',
+    iconImg: '/wee-editor/images/icon-well-tested.png',
     title: 'Well Tested',
     description: 'Comprehensive test coverage with automated testing'
   }
@@ -169,27 +169,27 @@ const features = [
 
 const screenshots = [
   {
-    src: '/wee/images/wee-skills.png',
+    src: '/wee-editor/images/wee-skills.png',
     alt: 'Skills',
     caption: 'Reusable Prompt Packages for Your Agents'
   },
   {
-    src: '/wee/images/wee-git-search.png',
+    src: '/wee-editor/images/wee-git-search.png',
     alt: 'Git Repository Search',
     caption: 'Search and Clone GitHub Repositories'
   },
   {
-    src: '/wee/images/cct-stats.png',
+    src: '/wee-editor/images/cct-stats.png',
     alt: 'Detailed Statistics',
     caption: 'Comprehensive Analytics and Performance Metrics'
   },
   {
-    src: '/wee/images/cct-themes.png',
+    src: '/wee-editor/images/cct-themes.png',
     alt: 'Theme Settings',
     caption: 'Multiple Theme Families with Dark and Light Modes'
   },
   {
-    src: '/wee/images/cct-shortcuts.png',
+    src: '/wee-editor/images/cct-shortcuts.png',
     alt: 'Keyboard Shortcuts',
     caption: 'Global Keyboard Shortcuts for Enhanced Productivity'
   }

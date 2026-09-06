@@ -3,10 +3,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/schlunsen/wee/releases"><img src="https://img.shields.io/github/v/release/schlunsen/wee" alt="Release" /></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.25%2B-00ADD8?style=flat&logo=go" alt="Go Version" /></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
-  <a href="https://github.com/schlunsen/wee/actions/workflows/ci.yml"><img src="https://github.com/schlunsen/wee/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/schlunsen/wee-editor/actions/workflows/ci.yml"><img src="https://github.com/schlunsen/wee-editor/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 **The cockpit for engineers who run AI at scale.** Sandboxed agent sessions with full terminal access, real-time analytics, and multi-provider support.
@@ -17,8 +16,8 @@
 </p>
 
 <p align="center">
-  <a href="https://schlunsen.github.io/wee/">🌐 Website</a> &nbsp;|&nbsp;
-  <a href="https://schlunsen.github.io/wee/presentation.html">🎬 Presentation</a>
+  <a href="https://schlunsen.github.io/wee-editor/">🌐 Website</a> &nbsp;|&nbsp;
+  <a href="https://schlunsen.github.io/wee-editor/presentation.html">🎬 Presentation</a>
 </p>
 
 ## What is Wee?
@@ -38,9 +37,9 @@ Single binary. No dependencies. Runs on macOS and Linux.
 
 ```bash
 # Clone and build
-git clone https://github.com/schlunsen/wee
-cd wee
-make build
+git clone https://github.com/schlunsen/wee-editor
+cd wee-editor
+just build
 
 # Launch (opens browser automatically)
 ./wee
@@ -50,21 +49,8 @@ Create your admin user at the setup page, and you're in.
 
 ## Install
 
-**Homebrew:**
-```bash
-brew install schlunsen/wee/wee
-```
-
-**Binary download:**
-```bash
-curl -L https://github.com/schlunsen/wee/releases/latest/download/wee-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') -o wee
-chmod +x wee && sudo mv wee /usr/local/bin/
-```
-
-**From source:**
-```bash
-go install github.com/schlunsen/wee/cmd/wee@latest
-```
+Build from source using the Quick Start instructions above. Prebuilt binaries
+and a Homebrew package have not yet been published for this repository.
 
 ## Key Features
 

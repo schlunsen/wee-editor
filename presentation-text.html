@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wee — Short Overview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a14;
+      --bg-2: #11111d;
+      --fg: #e4e4ee;
+      --muted: #9a9ab0;
+      --border: rgba(255, 255, 255, 0.08);
+      --cyan: #67e8f9;
+      --purple: #a78bfa;
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --pink: #f472b6;
+      --red: #f87171;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      background:
+        radial-gradient(circle at 20% 0%, rgba(167,139,250,0.08), transparent 40%),
+        radial-gradient(circle at 80% 100%, rgba(103,232,249,0.06), transparent 40%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 64px 28px 96px;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 28px;
+      margin-bottom: 40px;
+    }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 12px;
+      color: var(--cyan);
+      font-weight: 600;
+      margin: 0 0 8px;
+    }
+    h1 {
+      font-size: 48px;
+      font-weight: 800;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #fff, var(--purple));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .tagline {
+      color: var(--muted);
+      font-size: 17px;
+      margin: 0;
+    }
+    h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 40px 0 12px;
+      color: #fff;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    h2::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan);
+      display: inline-block;
+    }
+    p { margin: 0 0 14px; color: var(--fg); }
+    p.muted { color: var(--muted); }
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    ul li {
+      padding: 10px 0 10px 22px;
+      border-bottom: 1px dashed var(--border);
+      position: relative;
+      color: var(--fg);
+    }
+    ul li:last-child { border-bottom: none; }
+    ul li::before {
+      content: '›';
+      position: absolute;
+      left: 0;
+      color: var(--purple);
+      font-weight: 700;
+    }
+    strong { color: #fff; font-weight: 600; }
+    .pillars {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin: 8px 0 0;
+    }
+    .pillar {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .pillar .num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--cyan);
+      margin-bottom: 4px;
+    }
+    .pillar .title {
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 2px;
+    }
+    .pillar .desc {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--cyan);
+    }
+    pre {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--green);
+      margin: 12px 0;
+    }
+
+    /* --- Battery Packs additions --- */
+    .packs {
+      display: grid;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .pack {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    .pack::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--accent, var(--purple));
+      opacity: 0.8;
+    }
+    .pack-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .pack-icon { font-size: 18px; }
+    .pack-title {
+      font-weight: 600;
+      color: #fff;
+      font-size: 15px;
+    }
+    .pack-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+      background: rgba(255,255,255,0.04);
+      padding: 2px 7px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+    }
+    .pack-desc {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 8px;
+    }
+    .pack-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 6px;
+    }
+    .pack-tools code {
+      font-size: 11.5px;
+      color: var(--accent, var(--purple));
+      background: rgba(255,255,255,0.03);
+      padding: 2px 7px;
+    }
+    .pack.handover { --accent: var(--cyan); }
+    .pack.memory   { --accent: var(--pink); }
+    .pack.skills   { --accent: var(--amber); }
+    .pack.sandbox  { --accent: var(--green); }
+    .pack.deploy   { --accent: var(--purple); }
+    .pack.gpu      { --accent: var(--red); }
+
+    .skill-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+    }
+    .skill-card .name {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--amber);
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .skill-card .what { color: #fff; font-weight: 600; margin: 0 0 2px; font-size: 14.5px; }
+    .skill-card .why { color: var(--muted); font-size: 13.5px; margin: 0; }
+
+    .cta {
+      margin-top: 48px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--purple);
+      color: #0a0a14;
+    }
+    .btn-primary:hover { background: #b89dfb; }
+    .btn-secondary {
+      background: transparent;
+      color: var(--fg);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--cyan); color: var(--cyan); }
+    footer {
+      margin-top: 56px;
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+    }
+    @media (max-width: 560px) {
+      h1 { font-size: 36px; }
+      .pillars { grid-template-columns: 1fr; }
+      .container { padding: 40px 20px 64px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <p class="eyebrow">Control Center for Claude Code</p>
+      <h1>Wee</h1>
+      <p class="tagline">Run, monitor &amp; control AI agents — live sessions, real-time analytics, multi-provider, in a single 15MB binary.</p>
+    </header>
+
+    <h2>The problem</h2>
+    <p>Developers run dozens of Claude sessions daily. The terminal gives you no history, no metrics, and no way to run agents side-by-side. You lose context, burn tokens, and have zero visibility into what your agents are doing.</p>
+
+    <h2>What Wee is</h2>
+    <p>A self-hosted control plane that wraps Claude Code with a live web UI, persistent storage, and multi-provider support — all from one Go binary.</p>
+
+    <h2>Four pillars</h2>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="num">01</div>
+        <div class="title">Connect</div>
+        <div class="desc">Live agent sessions in the browser via WebSocket.</div>
+      </div>
+      <div class="pillar">
+        <div class="num">02</div>
+        <div class="title">Control</div>
+        <div class="desc">Granular permissions, YOLO mode, provider selection.</div>
+      </div>
+      <div class="pillar">
+        <div class="num">03</div>
+        <div class="title">Monitor</div>
+        <div class="desc">Real-time tokens, costs, and tool executions.</div>
+      </div>
+      <div class="pillar">
+        <div class="num">04</div>
+        <div class="title">Persist</div>
+        <div class="desc">SQLite-backed sessions, handoffs, and analytics.</div>
+      </div>
+    </div>
+
+    <h2>Highlights</h2>
+    <ul>
+      <li><strong>Live sessions</strong> — stream every tool call (Bash, Read, Write, Edit, MCP) in real time.</li>
+      <li><strong>Multi-provider</strong> — Claude, DeepSeek, GLM, Kimi, Z.AI, or any Anthropic-compatible API.</li>
+      <li><strong>Real-time dashboard</strong> — token usage, costs, git status, and session metrics.</li>
+      <li><strong>Built for speed</strong> — single 15MB Go binary, no Node.js, no Docker required.</li>
+      <li><strong>Voice input</strong> — local Parakeet v3 speech-to-text.</li>
+      <li><strong>Optional Docker</strong> — single-command deploy when you want it.</li>
+    </ul>
+
+    <h2>MCP battery packs</h2>
+    <p class="muted">Wee ships with a unified <code>wee-tools</code> MCP server — six grouped toolkits, batteries included.</p>
+    <div class="packs">
+
+      <div class="pack handover">
+        <div class="pack-head">
+          <span class="pack-icon">🤝</span>
+          <span class="pack-title">Session Handovers</span>
+          <span class="pack-count">4 tools</span>
+        </div>
+        <p class="pack-desc">Pass an agent's full context — history, cwd, branch, permissions — to a fresh session via a secure token.</p>
+        <div class="pack-tools">
+          <code>get_current_session</code><code>list_sessions</code><code>create_handover</code><code>accept_handover</code>
+        </div>
+      </div>
+
+      <div class="pack memory">
+        <div class="pack-head">
+          <span class="pack-icon">🧠</span>
+          <span class="pack-title">Memory Palace</span>
+          <span class="pack-count">2 tools</span>
+        </div>
+        <p class="pack-desc">Persistent per-project store for decisions, patterns, gotchas, and conventions — recallable from every session.</p>
+        <div class="pack-tools">
+          <code>store_memory</code><code>recall_memories</code>
+        </div>
+      </div>
+
+      <div class="pack skills">
+        <div class="pack-head">
+          <span class="pack-icon">📚</span>
+          <span class="pack-title">Skills Library</span>
+          <span class="pack-count">4 tools</span>
+        </div>
+        <p class="pack-desc">List, invoke, and grow reusable skills. Turn a finished handover into a permanent, named workflow.</p>
+        <div class="pack-tools">
+          <code>list_skills</code><code>invoke_skill</code><code>create_skill_from_handover</code><code>get_hook_status</code>
+        </div>
+      </div>
+
+      <div class="pack sandbox">
+        <div class="pack-head">
+          <span class="pack-icon">🛠️</span>
+          <span class="pack-title">Sandbox File Ops</span>
+          <span class="pack-count">6 tools</span>
+        </div>
+        <p class="pack-desc">Claude Code-equivalent file and shell tools, scoped to a sandboxed workspace. Safe for remote agents.</p>
+        <div class="pack-tools">
+          <code>Bash</code><code>Read</code><code>Write</code><code>Edit</code><code>Glob</code><code>Grep</code>
+        </div>
+      </div>
+
+      <div class="pack deploy">
+        <div class="pack-head">
+          <span class="pack-icon">🚀</span>
+          <span class="pack-title">App Deploy</span>
+          <span class="pack-count">3 tools</span>
+        </div>
+        <p class="pack-desc">Ship a web app from inside an agent session — one call publishes to a live <code>*.sandbox.wee.cat</code> subdomain.</p>
+        <div class="pack-tools">
+          <code>deploy_app</code><code>list_deployed_apps</code><code>undeploy_app</code>
+        </div>
+      </div>
+
+      <div class="pack gpu">
+        <div class="pack-head">
+          <span class="pack-icon">🎮</span>
+          <span class="pack-title">GPU Sidecar</span>
+          <span class="pack-count">12 tools</span>
+        </div>
+        <p class="pack-desc">On-demand RunPod GPUs (4090 → A100 → H100). Push code, train, pull results — pay-per-hour, lifecycle-managed.</p>
+        <div class="pack-tools">
+          <code>gpu_launch</code><code>gpu_status</code><code>gpu_run</code><code>gpu_push</code><code>gpu_pull</code><code>gpu_stop</code><code>gpu_resume</code><code>gpu_terminate</code><code>gpu_resize</code><code>gpu_templates</code><code>gpu_list_volumes</code><code>gpu_create_volume</code>
+        </div>
+      </div>
+
+    </div>
+
+    <h2>Built-in skills</h2>
+    <p class="muted">Skills are named, reusable playbooks. Wee ships with a starter set, and you can grow your own library.</p>
+    <div class="skill-card">
+      <div class="name">release</div>
+      <p class="what">Cut a versioned release end-to-end.</p>
+      <p class="why">Bumps the version, tags the commit, builds cross-platform binaries, and updates the Homebrew formula — with auto-generated code names.</p>
+    </div>
+    <div class="skill-card">
+      <div class="name">create_skill_from_handover</div>
+      <p class="what">Bottle any workflow you complete.</p>
+      <p class="why">Finish a tricky migration, refactor, or audit? Package the steps as a permanent, invokable skill — usable by every future session.</p>
+    </div>
+
+    <h2>Get started</h2>
+    <pre>curl -fsSL https://raw.githubusercontent.com/schlunsen/wee-editor/main/scripts/install.sh | bash
+wee serve --port 3000</pre>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/schlunsen/wee-editor" target="_blank" rel="noopener">View on GitHub</a>
+      <a class="btn btn-secondary" href="presentation.html">Full presentation →</a>
+    </div>
+
+    <footer>Wee · 2026 · Take control of your AI coding workflow.</footer>
+  </main>
+</body>
+</html>

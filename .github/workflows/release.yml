@@ -35,7 +35,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
 
       - name: Install cross-compilation tools
         if: matrix.arch == 'arm64'
@@ -84,7 +84,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
 
       - name: Build binary
         env:
@@ -170,7 +170,7 @@ jobs:
   #     - name: Set up Go
   #       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
   #       with:
-  #         go-version: '1.23'
+  #         go-version: '1.25'
 
   #     - name: Build binary
   #       env:
@@ -204,7 +204,9 @@ jobs:
           merge-multiple: true
 
       - name: Display structure of downloaded files
-        run: ls -R dist
+        run: |
+          chmod +x dist/wee-linux-* dist/wee-darwin-*
+          ls -R dist
 
       - name: Package macOS binaries with dylibs
         run: |
@@ -242,6 +244,7 @@ jobs:
           echo "sha256_darwin_arm64=$(shasum -a 256 wee-darwin-arm64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
           echo "sha256_linux_amd64=$(shasum -a 256 wee-linux-amd64 | awk '{print $1}')" >> $GITHUB_OUTPUT
           echo "sha256_linux_arm64=$(shasum -a 256 wee-linux-arm64 | awk '{print $1}')" >> $GITHUB_OUTPUT
+          sha256sum wee-darwin-*.tar.gz wee-linux-* wee-licenses.tar.gz > SHA256SUMS
           cd ..
 
       - name: Get version from tag
@@ -273,9 +276,11 @@ jobs:
             dist/wee-linux-amd64
             dist/wee-linux-arm64
             dist/wee-licenses.tar.gz
+            dist/SHA256SUMS
           name: ${{ steps.release_name.outputs.tag_message }}
           generate_release_notes: true
-          draft: false
+          draft: true
+          fail_on_unmatched_files: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

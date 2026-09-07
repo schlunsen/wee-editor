@@ -2,320 +2,74 @@ name: Build and Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-linux:
-    name: Build Linux Binaries
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ matrix.os }} ${{ matrix.arch }}
     strategy:
+      fail-fast: false
       matrix:
-        arch: [amd64, arm64]
-
+        include:
+          - {runner: ubuntu-22.04, os: linux, arch: amd64, triple: x86_64-unknown-linux-gnu}
+          - {runner: ubuntu-22.04-arm, os: linux, arch: arm64, triple: aarch64-unknown-linux-gnu}
+          - {runner: macos-15-intel, os: darwin, arch: amd64, triple: x86_64-apple-darwin}
+          - {runner: macos-14, os: darwin, arch: arm64, triple: aarch64-apple-darwin}
+    runs-on: ${{ matrix.runner }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
-
-      - name: Build Nuxt frontend
+          node-version: '22'
+      - name: Build frontend
+        working-directory: internal/server/frontend
         run: |
-          cd internal/server/frontend
           npm ci
           npm run generate
-
-      - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '1.23'
-
-      - name: Install cross-compilation tools
-        if: matrix.arch == 'arm64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Build binary
+          go-version-file: go.mod
+      - name: Install Linux packaging tools
+        if: matrix.os == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y patchelf
+      - name: Build and package
         env:
-          GOOS: linux
-          GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: 1
-          CC: ${{ matrix.arch == 'arm64' && 'aarch64-linux-gnu-gcc' || 'gcc' }}
-        run: |
-          mkdir -p dist
-          go build -ldflags="-s -w" -o "dist/wee-linux-${{ matrix.arch }}" ./cmd/wee
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+          RELEASE_OS: ${{ matrix.os }}
+          RELEASE_ARCH: ${{ matrix.arch }}
+          RELEASE_TRIPLE: ${{ matrix.triple }}
+          CGO_ENABLED: '1'
+        run: bash scripts/package-release.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: wee-linux-${{ matrix.arch }}
-          path: dist/*
-
-  build-darwin:
-    name: Build macOS Binaries
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '20'
-
-      - name: Build Nuxt frontend
-        run: |
-          cd internal/server/frontend
-          npm ci
-          npm run generate
-
-      - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-        with:
-          go-version: '1.23'
-
-      - name: Build binary
-        env:
-          GOOS: darwin
-          GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: 1
-        run: |
-          mkdir -p dist
-          go build -ldflags="-s -w" -o "dist/wee-darwin-${{ matrix.arch }}" ./cmd/wee
-
-      - name: Bundle dylibs and fix rpaths (macOS)
-        run: |
-          BINARY="dist/wee-darwin-${{ matrix.arch }}"
-
-          # Determine the architecture-specific lib directory
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            ARCH_DIR="aarch64-apple-darwin"
-          else
-            ARCH_DIR="x86_64-apple-darwin"
-          fi
-
-          # Find the sherpa-onnx dylib directory in Go module cache
-          SHERPA_LIB=$(find $HOME/go/pkg/mod/github.com/k2-fsa/sherpa-onnx-go-macos*/lib/${ARCH_DIR} -maxdepth 0 2>/dev/null | head -1)
-
-          if [ -n "$SHERPA_LIB" ]; then
-            echo "Found sherpa-onnx libs at: $SHERPA_LIB"
-
-            # Create arch-specific lib directory for bundling
-            mkdir -p dist/lib-darwin-${{ matrix.arch }}
-
-            # Copy required dylibs (skip symlink duplicates)
-            for dylib in libsherpa-onnx-c-api.dylib libsherpa-onnx-cxx-api.dylib libonnxruntime.1.23.2.dylib; do
-              if [ -f "$SHERPA_LIB/$dylib" ]; then
-                cp "$SHERPA_LIB/$dylib" dist/lib-darwin-${{ matrix.arch }}/
-                echo "Bundled: $dylib"
-              fi
-            done
-
-            # Create the onnxruntime symlink
-            cd dist/lib-darwin-${{ matrix.arch }} && ln -sf libonnxruntime.1.23.2.dylib libonnxruntime.dylib && cd ../..
-
-            # Replace the hardcoded rpath with @executable_path/../lib
-            CURRENT_RPATH=$(otool -l "$BINARY" | grep -A 2 "LC_RPATH" | grep "path " | awk '{print $2}')
-            if [ -n "$CURRENT_RPATH" ]; then
-              echo "Replacing rpath: $CURRENT_RPATH -> @executable_path/../lib"
-              install_name_tool -rpath "$CURRENT_RPATH" "@executable_path/../lib" "$BINARY"
-            fi
-
-            # Verify the fix
-            echo "Updated rpaths:"
-            otool -l "$BINARY" | grep -A 2 "LC_RPATH"
-          else
-            echo "No sherpa-onnx libs found, skipping dylib bundling"
-          fi
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: wee-darwin-${{ matrix.arch }}
-          path: |
-            dist/wee-darwin-${{ matrix.arch }}
-            dist/lib-darwin-${{ matrix.arch }}/
-
-  # build-windows:
-  #   name: Build Windows Binary
-  #   runs-on: windows-latest
-
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-  #     - name: Set up Node.js
-  #       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-  #       with:
-  #         node-version: '20'
-
-  #     - name: Build Nuxt frontend
-  #       run: |
-  #         cd internal/server/frontend
-  #         npm ci
-  #         npm run generate
-
-  #     - name: Set up Go
-  #       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-  #       with:
-  #         go-version: '1.23'
-
-  #     - name: Build binary
-  #       env:
-  #         GOOS: windows
-  #         GOARCH: amd64
-  #         CGO_ENABLED: 1
-  #       run: |
-  #         mkdir -p dist
-  #         go build -ldflags="-s -w" -o "dist/wee-windows-amd64.exe" ./cmd/wee
-
-  #     - name: Upload artifact
-  #       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-  #       with:
-  #         name: wee-windows-amd64
-  #         path: dist/*
+          name: wee-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
 
   release:
-    name: Create Release
-    needs: [build-linux, build-darwin]
+    name: Create draft release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-
+    permissions:
+      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: dist
           merge-multiple: true
-
-      - name: Display structure of downloaded files
-        run: ls -R dist
-
-      - name: Package macOS binaries with dylibs
-        run: |
-          cd dist
-          # Package macOS binaries as tar.gz with bundled dylibs
-          for arch in amd64 arm64; do
-            if [ -f "wee-darwin-${arch}" ] && [ -d "lib-darwin-${arch}" ]; then
-              mkdir -p "wee-darwin-${arch}-pkg/bin" "wee-darwin-${arch}-pkg/lib" "wee-darwin-${arch}-pkg/licenses"
-              cp "wee-darwin-${arch}" "wee-darwin-${arch}-pkg/bin/wee"
-              cp lib-darwin-${arch}/*.dylib "wee-darwin-${arch}-pkg/lib/" 2>/dev/null || true
-              # Wee's own license plus upstream notices for the bundled dylibs
-              cp ../LICENSE "wee-darwin-${arch}-pkg/LICENSE"
-              cp ../licenses/*.txt ../licenses/THIRD_PARTY_NOTICES.md "wee-darwin-${arch}-pkg/licenses/"
-              # Recreate symlink
-              cd "wee-darwin-${arch}-pkg/lib" && ln -sf libonnxruntime.1.23.2.dylib libonnxruntime.dylib 2>/dev/null || true && cd ../..
-              tar -czf "wee-darwin-${arch}.tar.gz" -C "wee-darwin-${arch}-pkg" .
-              echo "Created wee-darwin-${arch}.tar.gz"
-            fi
-          done
-          cd ..
-
-      - name: Assemble third-party notice bundle
-        run: |
-          mkdir -p dist/notice-pkg/licenses
-          cp LICENSE dist/notice-pkg/LICENSE
-          cp licenses/*.txt licenses/THIRD_PARTY_NOTICES.md dist/notice-pkg/licenses/
-          tar -czf dist/wee-licenses.tar.gz -C dist/notice-pkg .
-          rm -rf dist/notice-pkg
-
-      - name: Generate SHA256 checksums
-        id: checksums
-        run: |
-          cd dist
-          echo "sha256_darwin_amd64=$(shasum -a 256 wee-darwin-amd64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
-          echo "sha256_darwin_arm64=$(shasum -a 256 wee-darwin-arm64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
-          echo "sha256_linux_amd64=$(shasum -a 256 wee-linux-amd64 | awk '{print $1}')" >> $GITHUB_OUTPUT
-          echo "sha256_linux_arm64=$(shasum -a 256 wee-linux-arm64 | awk '{print $1}')" >> $GITHUB_OUTPUT
-          cd ..
-
-      - name: Get version from tag
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Generate Homebrew formula
-        run: |
-          sed -e "s/{{VERSION}}/${{ steps.version.outputs.version }}/g" \
-              -e "s/{{SHA256_DARWIN_AMD64}}/${{ steps.checksums.outputs.sha256_darwin_amd64 }}/g" \
-              -e "s/{{SHA256_DARWIN_ARM64}}/${{ steps.checksums.outputs.sha256_darwin_arm64 }}/g" \
-              -e "s/{{SHA256_LINUX_AMD64}}/${{ steps.checksums.outputs.sha256_linux_amd64 }}/g" \
-              -e "s/{{SHA256_LINUX_ARM64}}/${{ steps.checksums.outputs.sha256_linux_arm64 }}/g" \
-              .github/homebrew-formula.rb.template > dist/wee.rb
-
-      - name: Get release name from tag
-        id: release_name
-        run: |
-          # Get the tag annotation message (first line only, excluding GPG signature)
-          TAG_MESSAGE=$(git tag -l --format='%(contents:lines=1)' ${GITHUB_REF#refs/tags/})
-          echo "tag_message=$TAG_MESSAGE" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum wee-*.tar.gz > SHA256SUMS
+      - uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
+          name: Wee Editor ${{ github.ref_name }}
           files: |
-            dist/wee-darwin-amd64.tar.gz
-            dist/wee-darwin-arm64.tar.gz
-            dist/wee-linux-amd64
-            dist/wee-linux-arm64
-            dist/wee-licenses.tar.gz
-          name: ${{ steps.release_name.outputs.tag_message }}
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          draft: true
+          fail_on_unmatched_files: true
           generate_release_notes: true
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Homebrew formula to tap
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        run: |
-          echo "📦 Homebrew formula generated at dist/wee.rb"
-          cat dist/wee.rb
-
-          # Push formula to homebrew-wee tap repository using GitHub API
-          TAP_TOKEN="${{ secrets.HOMEBREW_TAP_TOKEN }}"
-          if [ -z "$TAP_TOKEN" ]; then
-            echo "⚠️  HOMEBREW_TAP_TOKEN secret not set. Skipping tap update."
-            echo "To enable automatic tap updates, create a PAT with 'repo' scope"
-            echo "and add it as a repository secret named HOMEBREW_TAP_TOKEN"
-            exit 0
-          fi
-
-          FORMULA_CONTENT=$(base64 -w0 < $GITHUB_WORKSPACE/dist/wee.rb)
-
-          # Get current file SHA if it exists
-          EXISTING_SHA=$(curl -s \
-            -H "Authorization: token ${TAP_TOKEN}" \
-            "https://api.github.com/repos/schlunsen/homebrew-wee/contents/Formula/wee.rb" \
-            | jq -r '.sha // empty')
-
-          # Create or update the formula file
-          if [ -n "$EXISTING_SHA" ]; then
-            curl -sf -X PUT \
-              -H "Authorization: token ${TAP_TOKEN}" \
-              -H "Content-Type: application/json" \
-              "https://api.github.com/repos/schlunsen/homebrew-wee/contents/Formula/wee.rb" \
-              -d "{\"message\":\"Update formula for v${{ steps.version.outputs.version }}\",\"content\":\"${FORMULA_CONTENT}\",\"sha\":\"${EXISTING_SHA}\"}"
-          else
-            curl -sf -X PUT \
-              -H "Authorization: token ${TAP_TOKEN}" \
-              -H "Content-Type: application/json" \
-              "https://api.github.com/repos/schlunsen/homebrew-wee/contents/Formula/wee.rb" \
-              -d "{\"message\":\"Add formula for v${{ steps.version.outputs.version }}\",\"content\":\"${FORMULA_CONTENT}\"}"
-          fi
-
-          echo "✅ Homebrew tap updated at schlunsen/homebrew-wee"

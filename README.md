@@ -49,8 +49,12 @@ Create your admin user at the setup page, and you're in.
 
 ## Install
 
-Build from source using the Quick Start instructions above. Prebuilt binaries
-and a Homebrew package have not yet been published for this repository.
+Download the archive for your operating system and architecture from
+[Releases](https://github.com/schlunsen/wee-editor/releases). Verify it against
+`SHA256SUMS`, extract it, and run `./bin/wee`. Keep `bin/` and `lib/` together;
+the shared libraries are required. Each archive includes license notices.
+
+Alternatively, build from source using the Quick Start instructions above.
 
 ## Key Features
 

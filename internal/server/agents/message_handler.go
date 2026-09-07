@@ -82,11 +82,7 @@ func (sm *SessionManager) sendPromptInternal(sessionID uuid.UUID, prompt string,
 	// because session.responseChan is never closed (only InterruptSession closes it).
 	// Simply draining isn't enough — we must close the old channel so the old goroutine
 	// unblocks and exits, then create a fresh channel for the new query.
-	oldResponseChan := session.responseChan
-	session.responseChan = make(chan types.Message, 10)
-	if oldResponseChan != nil {
-		close(oldResponseChan)
-	}
+	swapResponseChan(session)
 
 	// Reset activeStreamerCount to 0 so the new receiveQueryResponses doesn't
 	// incorrectly route messages through the channel before the new streamer starts.
@@ -641,11 +637,7 @@ func (sm *SessionManager) SendPromptWithContent(sessionID uuid.UUID, content []C
 
 	// Replace the response channel to guarantee any leaked streamFiberResponses goroutines exit.
 	// (Same fix as sendPromptInternal — see comment there for full rationale.)
-	oldResponseChan := session.responseChan
-	session.responseChan = make(chan types.Message, 10)
-	if oldResponseChan != nil {
-		close(oldResponseChan)
-	}
+	swapResponseChan(session)
 	if old := atomic.SwapInt32(&session.activeStreamerCount, 0); old != 0 {
 		logging.Warning("Session %s: Reset stale activeStreamerCount from %d to 0 before new prompt (WithContent)", session.ID, old)
 	}
@@ -1077,17 +1069,17 @@ func (sm *SessionManager) receiveQueryResponses(session *AgentSession, messages 
 			// broadcast directly to WebSocket clients instead of writing to the channel.
 			// Messages are already persisted to DB above, so this is safe.
 			if atomic.LoadInt32(&session.activeStreamerCount) > 0 {
-				select {
-				case session.responseChan <- msg:
+				switch sm.sendResponse(session, msg) {
+				case responseSent:
 					logging.Debug("Session %s: Message #%d forwarded to response channel", session.ID, messageCount)
-				case <-session.ctx.Done():
+				case responseAborted:
 					logging.Info("Session %s: Context cancelled after %d messages", session.ID, messageCount)
 					return
-				case <-time.After(5 * time.Second):
-					// CRITICAL FIX: Timeout prevents deadlock when activeStreamerCount > 0
+				default:
+					// The timeout prevents a deadlock when activeStreamerCount > 0
 					// but the reader goroutine has already exited (e.g., WebSocket died).
 					// Fall through to direct broadcast so messages aren't lost forever.
-					logging.Warning("Session %s: Channel send timed out for message #%d (type=%s), falling back to direct broadcast",
+					logging.Warning("Session %s: Channel send failed for message #%d (type=%s), falling back to direct broadcast",
 						session.ID, messageCount, messageType)
 					atomic.AddInt32(&session.missedMessageCount, 1)
 					sm.invokeBroadcastMessageCallback(session.ID, msg)

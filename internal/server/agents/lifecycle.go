@@ -609,11 +609,7 @@ func (sm *SessionManager) InterruptSession(sessionID uuid.UUID) error {
 	// This ensures that if receiveQueryResponses enters its select after the replace,
 	// it uses the new channel (safe). The old streamFiberResponses holds the old
 	// channel by parameter, so closing it causes its `for msg := range` to exit.
-	oldResponseChan := session.responseChan
-	session.responseChan = make(chan types.Message, 10)
-	if oldResponseChan != nil {
-		close(oldResponseChan)
-	}
+	swapResponseChan(session)
 
 	// Reset activeStreamerCount to 0 to ensure clean state for the next prompt.
 	// The old streamFiberResponses goroutine's defer will try to decrement, but

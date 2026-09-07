@@ -113,6 +113,7 @@ type AgentSession struct {
 	directMCPMu          sync.Mutex         // Protects directMCPClient
 	codexTurnDone        chan struct{}      // Closed when the in-flight Codex turn exits; nil when none is running
 	codexTurnMu          sync.Mutex         // Protects codexTurnDone
+	respMu               sync.RWMutex       // Guards responseChan: producers RLock while sending, swapResponseChan Locks to swap+close
 
 	// Loop mode runtime state (managed by LoopController; not persisted to DB).
 	loopActive    bool       // True while an autonomous loop is running for this session

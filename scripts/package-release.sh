@@ -51,10 +51,9 @@ else
 fi
 # Remove access to module-cache libraries during the smoke test.
 lib_source="$module_dir/lib/$RELEASE_TRIPLE"
-chmod u+w "$(dirname "$lib_source")"
-mv "$lib_source" "$lib_source.release-test"
+chmod a-rx "$lib_source"
 restore() {
-  mv "$lib_source.release-test" "$lib_source"
+  chmod a+rx "$lib_source"
   rm -rf "$package_dir"
 }
 trap restore EXIT

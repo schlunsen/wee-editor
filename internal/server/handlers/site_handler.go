@@ -150,10 +150,16 @@ func isValidModelForProvider(provider, model string) bool {
 		}
 	case "glm":
 		validModels := []string{
-			"glm-4.6",
-			"glm-4.5-air",
-			"glm-5",
+			"glm-5.3",
+			"glm-5.3-flash",
+			"glm-5.2",
 			"glm-5.1",
+			"glm-5-turbo",
+			"glm-5",
+			"glm-4.7",
+			"glm-4.6",
+			"glm-4.5",
+			"glm-4.5-air",
 		}
 		for _, m := range validModels {
 			if model == m {
@@ -162,13 +168,10 @@ func isValidModelForProvider(provider, model string) bool {
 		}
 	case "kimi":
 		validModels := []string{
+			"kimi-k3",
+			"kimi-k2.7-code",
+			"kimi-k2.7-code-highspeed",
 			"kimi-k2.6",
-			"kimi-k2.5",
-			"kimi-k2",
-			"kimi-k2-thinking",
-			"kimi-k2-0905",
-			"kimi-k2-turbo-preview",
-			"moonshot-v1-128k",
 		}
 		for _, m := range validModels {
 			if model == m {

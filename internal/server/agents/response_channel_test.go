@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -33,22 +34,22 @@ func TestSendResponseRacesWithSwap(t *testing.T) {
 	session := newRespChanTestSession()
 	defer session.cancel()
 
-	// Keep the channel drained so senders never park on a full buffer.
-	stop := make(chan struct{})
-	defer close(stop)
-	go func() {
-		for {
-			session.respMu.RLock()
-			ch := session.responseChan
-			session.respMu.RUnlock()
-			select {
-			case <-ch:
-			case <-stop:
-				return
-			case <-time.After(time.Millisecond):
+	// Model the production reader: streamFiberResponses receives the channel
+	// by parameter and ranges over it until the swap closes it, never taking
+	// respMu. That matters — a reader that re-acquired respMu on each message
+	// would be blocked by a pending writer (Go's RWMutex parks new readers once
+	// Lock is waiting), so a parked sender and a waiting swapper would wedge
+	// each other until the send timed out.
+	drain := func(ch chan types.Message) {
+		go func() {
+			for range ch {
 			}
-		}
-	}()
+		}()
+	}
+
+	session.respMu.RLock()
+	drain(session.responseChan)
+	session.respMu.RUnlock()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -56,7 +57,10 @@ func TestSendResponseRacesWithSwap(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 300; j++ {
-				sm.sendResponse(session, textMsg("hello"))
+				if got := sm.sendResponse(session, textMsg("hello")); got == responseTimedOut {
+					t.Errorf("send parked for %s despite an active reader", responseChanSendTimeout)
+					return
+				}
 			}
 		}()
 	}
@@ -64,7 +68,13 @@ func TestSendResponseRacesWithSwap(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for j := 0; j < 300; j++ {
+			// Each swap starts a reader for the new channel, exactly as a new
+			// prompt starts a fresh streamFiberResponses.
 			swapResponseChan(session)
+			session.respMu.RLock()
+			drain(session.responseChan)
+			session.respMu.RUnlock()
+			runtime.Gosched()
 		}
 	}()
 

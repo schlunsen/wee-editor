@@ -469,10 +469,7 @@ func (sm *SessionManager) sendDirectTextMessage(session *AgentSession, text stri
 		sm.mu.Unlock()
 	}
 
-	select {
-	case session.responseChan <- msg:
-	case <-session.ctx.Done():
-	}
+	logDroppedResponse(session, "text message", sm.sendResponse(session, msg))
 }
 
 func (sm *SessionManager) sendDirectToolUse(session *AgentSession, id, name string, input map[string]interface{}) {
@@ -501,10 +498,7 @@ func (sm *SessionManager) sendDirectToolUse(session *AgentSession, id, name stri
 		sm.mu.Unlock()
 	}
 
-	select {
-	case session.responseChan <- msg:
-	case <-session.ctx.Done():
-	}
+	logDroppedResponse(session, "tool use message", sm.sendResponse(session, msg))
 }
 
 func (sm *SessionManager) sendDirectToolResult(session *AgentSession, toolCallID, result string, isError bool) {
@@ -518,10 +512,7 @@ func (sm *SessionManager) sendDirectToolResult(session *AgentSession, toolCallID
 		Type:    "user",
 		Content: []types.ContentBlock{toolResultBlock},
 	}
-	select {
-	case session.responseChan <- msg:
-	case <-session.ctx.Done():
-	}
+	logDroppedResponse(session, "tool result message", sm.sendResponse(session, msg))
 }
 
 func (sm *SessionManager) sendDirectResultMessage(session *AgentSession, startTime time.Time, turns int, usage *llmclient.Usage) {
@@ -540,10 +531,7 @@ func (sm *SessionManager) sendDirectResultMessage(session *AgentSession, startTi
 			"total_tokens":  usage.TotalTokens,
 		}
 	}
-	select {
-	case session.responseChan <- resultMsg:
-	case <-session.ctx.Done():
-	}
+	logDroppedResponse(session, "result message", sm.sendResponse(session, resultMsg))
 }
 
 func (sm *SessionManager) sendDirectError(session *AgentSession, err error) {
@@ -553,10 +541,7 @@ func (sm *SessionManager) sendDirectError(session *AgentSession, err error) {
 		IsError: true,
 		Result:  &errMsg,
 	}
-	select {
-	case session.responseChan <- resultMsg:
-	case <-session.ctx.Done():
-	}
+	logDroppedResponse(session, "error message", sm.sendResponse(session, resultMsg))
 }
 
 // === Permission Handling ===

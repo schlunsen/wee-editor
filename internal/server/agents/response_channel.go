@@ -59,6 +59,13 @@ func (sm *SessionManager) sendResponse(session *AgentSession, msg types.Message)
 	}
 }
 
+// Readers must NOT take respMu. streamFiberResponses receives the channel by
+// parameter and ranges over it until a swap closes it, which is what keeps this
+// scheme live: Go's RWMutex parks new readers as soon as Lock is waiting, so a
+// reader that re-acquired respMu per message could be blocked by a pending
+// swapper while a producer is parked on a full buffer — the two would wedge
+// each other until the send timed out.
+//
 // swapResponseChan installs a fresh response channel and closes the old one,
 // so any leaked streamFiberResponses goroutine still ranging over it exits.
 // Closing happens under the write lock, which no producer can hold, so a

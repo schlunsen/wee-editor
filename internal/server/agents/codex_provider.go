@@ -392,6 +392,12 @@ func (sm *SessionManager) runCodexTurn(session *AgentSession, thread *codex.Thre
 	if err != nil {
 		return err
 	}
+	// Codex allows a single writer per thread. If this turn unwinds without
+	// draining the stream (a panic, or an early return added later), the codex
+	// subprocess stays alive holding the thread-store writer lock and every
+	// following prompt fails with "thread ... already has an active writer".
+	// Close is a no-op once the turn has ended normally.
+	defer func() { _ = stream.Close() }()
 
 	state := newCodexTurnState()
 	var usage *codextypes.Usage
@@ -703,10 +709,7 @@ func (sm *SessionManager) sendCodexThinking(session *AgentSession, text string) 
 		sm.mu.Unlock()
 	}
 
-	select {
-	case session.responseChan <- msg:
-	case <-session.ctx.Done():
-	}
+	logDroppedResponse(session, "thinking message", sm.sendResponse(session, msg))
 }
 
 func codexStr(p *string) string {

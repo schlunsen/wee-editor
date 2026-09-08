@@ -128,14 +128,14 @@ func (s *Server) seedKnownProvidersFromEnv() {
 			providerID:   "glm",
 			name:         "GLM (Z.ai)",
 			baseURL:      "https://api.z.ai/api/anthropic",
-			defaultModel: "glm-5",
+			defaultModel: "glm-5.3",
 		},
 		{
 			envVar:       "WEE_KIMI_API_KEY",
 			providerID:   "kimi",
 			name:         "Kimi",
 			baseURL:      "https://api.moonshot.ai/anthropic",
-			defaultModel: "kimi-k2",
+			defaultModel: "kimi-k3",
 		},
 		{
 			// Optional: the Codex CLI can also authenticate via `codex login`.

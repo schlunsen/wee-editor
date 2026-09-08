@@ -1525,6 +1525,88 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version:     39,
+		Description: "Sync Kimi and GLM models with the providers' live model lists",
+		Up: func(tx *sql.Tx) error {
+			// Model ids verified on 2026-09-08 against the providers' own
+			// /v1/models endpoints, which are the authority on what each API
+			// will actually accept:
+			//   GET https://api.moonshot.ai/v1/models
+			//   GET https://api.z.ai/api/anthropic/v1/models
+			//
+			// Moonshot has retired the whole kimi-k2* line except k2.6, so the
+			// stale ids are dropped rather than left in the picker to fail at
+			// request time. That includes kimi-k2, which was the stored default
+			// and is no longer served. glm-4.7-flash goes for the same reason:
+			// migration 25 introduced it, but Z.ai has never listed it.
+			updates := []struct {
+				providerID   string
+				models       []string
+				defaultModel string
+			}{
+				{
+					providerID:   "kimi",
+					models:       []string{"kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"},
+					defaultModel: "kimi-k3",
+				},
+				{
+					providerID: "glm",
+					models: []string{
+						"glm-5.3", "glm-5.3-flash", "glm-5.2", "glm-5.1", "glm-5-turbo",
+						"glm-5", "glm-4.7", "glm-4.6", "glm-4.5", "glm-4.5-air",
+					},
+					defaultModel: "glm-5.3",
+				},
+			}
+
+			for _, u := range updates {
+				modelsJSON, err := json.Marshal(u.models)
+				if err != nil {
+					return fmt.Errorf("failed to marshal %s models: %w", u.providerID, err)
+				}
+				if _, err := tx.Exec(`
+					UPDATE providers
+					SET models = ?, default_model = ?, updated_at = CURRENT_TIMESTAMP
+					WHERE provider_id = ?
+				`, string(modelsJSON), u.defaultModel, u.providerID); err != nil {
+					return fmt.Errorf("failed to update %s models: %w", u.providerID, err)
+				}
+			}
+
+			// Sessions and provider rows pinned to a retired model would fail on
+			// their next request, so move them onto the current flagship.
+			retired := map[string][]any{
+				"kimi": {"kimi-k3", "kimi-k2", "kimi-k2.5", "kimi-k2-thinking", "kimi-k2-0905", "kimi-k2-turbo-preview", "moonshot-v1-128k"},
+				"glm":  {"glm-5.3", "glm-4.7-flash"},
+			}
+			for providerID, args := range retired {
+				placeholders := ""
+				for i := 1; i < len(args); i++ {
+					if i > 1 {
+						placeholders += ", "
+					}
+					placeholders += "?"
+				}
+				if _, err := tx.Exec(fmt.Sprintf(`
+					UPDATE providers
+					SET model_name = ?, updated_at = CURRENT_TIMESTAMP
+					WHERE provider_id = '%s' AND model_name IN (%s)
+				`, providerID, placeholders), args...); err != nil {
+					return fmt.Errorf("failed to repoint %s provider model: %w", providerID, err)
+				}
+				if _, err := tx.Exec(fmt.Sprintf(`
+					UPDATE agent_sessions
+					SET model_name = ?
+					WHERE provider = '%s' AND model_name IN (%s)
+				`, providerID, placeholders), args...); err != nil {
+					return fmt.Errorf("failed to repoint %s sessions: %w", providerID, err)
+				}
+			}
+
+			return nil
+		},
+	},
 }
 
 // runMigrations runs all pending database migrations

@@ -138,6 +138,8 @@ github.com/schlunsen/claude-agent-sdk-go v0.10.0 h1:QP/SvnaMKvWuStGO7agwkMYrInkY
 github.com/schlunsen/claude-agent-sdk-go v0.10.0/go.mod h1:+igTNdn6qWD2UZgVczAgsOVpnPNULtZY2RLHaLR2/Ko=
 github.com/schlunsen/claude-agent-sdk-go v0.11.0 h1:2WyCiqVlp3oBhJ9BEUh4LvYKpj39DKommxaSBzQGGB4=
 github.com/schlunsen/claude-agent-sdk-go v0.11.0/go.mod h1:+igTNdn6qWD2UZgVczAgsOVpnPNULtZY2RLHaLR2/Ko=
+github.com/schlunsen/claude-agent-sdk-go v0.11.1 h1:MWujW0skCkUjyY6ZAqJDTa75qgeSChh3xlQtkfd9BC4=
+github.com/schlunsen/claude-agent-sdk-go v0.11.1/go.mod h1:+igTNdn6qWD2UZgVczAgsOVpnPNULtZY2RLHaLR2/Ko=
 github.com/schlunsen/codex-sdk-go v0.1.2 h1:DK6xSqglZ7+lGQY4JRgqLO37U06Fh1xS6IF62qqtisQ=
 github.com/schlunsen/codex-sdk-go v0.1.2/go.mod h1:ddqr98cW+aBcCv7Ck2rgKtbiS+m6h652mrtvbq8zElY=
 github.com/sergi/go-diff v1.2.0 h1:XU+rvMAioB0UC3q1MFrIQy4Vo5/4VsRDQQXHsEya6xQ=

@@ -15,7 +15,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/pquerna/otp v1.5.0
 	github.com/pterm/pterm v0.12.81
-	github.com/schlunsen/claude-agent-sdk-go v0.11.0
+	github.com/schlunsen/claude-agent-sdk-go v0.11.1
 	github.com/schlunsen/codex-sdk-go v0.1.2
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spf13/cobra v1.8.0

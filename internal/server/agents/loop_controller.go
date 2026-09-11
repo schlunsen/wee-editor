@@ -119,8 +119,8 @@ func loopGuards(cfg *LoopConfig) (maxIter, timeoutMin int) {
 	return maxIter, timeoutMin
 }
 
-// onLoopTurnComplete is the heart of loop mode. It is invoked from the
-// receiveQueryResponses defer block after every completed turn. It starts the
+// onLoopTurnComplete is the heart of loop mode. It is invoked from
+// completeTurn after every completed turn. It starts the
 // loop on the first turn, then for each subsequent turn runs the verification
 // check and decides whether to stop (verify passed / guard hit) or to silently
 // re-prompt the agent for another iteration.

@@ -84,7 +84,7 @@ func (sm *SessionManager) sendPromptInternal(sessionID uuid.UUID, prompt string,
 	// unblocks and exits, then create a fresh channel for the new query.
 	swapResponseChan(session)
 
-	// Reset activeStreamerCount to 0 so the new receiveQueryResponses doesn't
+	// Reset activeStreamerCount to 0 so the session reader doesn't
 	// incorrectly route messages through the channel before the new streamer starts.
 	if old := atomic.SwapInt32(&session.activeStreamerCount, 0); old != 0 {
 		logging.Warning("Session %s: Reset stale activeStreamerCount from %d to 0 before new prompt", session.ID, old)
@@ -598,12 +598,10 @@ func (sm *SessionManager) sendPromptInternal(sessionID uuid.UUID, prompt string,
 		return fmt.Errorf("failed to send query: %w", err)
 	}
 
-	// Get response channel
-	messages := client.ReceiveResponse(session.ctx)
-	logging.Info("SendPrompt: Client connected and query sent, starting response stream")
-	logging.Info("Streaming client created for session %s, starting response stream", sessionID)
-
-	go sm.receiveQueryResponses(session, messages)
+	// One reader drains this client for as long as it lives; it is started
+	// here only if it is not already running (see ensureSessionReader).
+	sm.ensureSessionReader(session, client)
+	logging.Info("SendPrompt: query sent for session %s", sessionID)
 
 	logging.Debug("SendPrompt: Completed successfully for session %s", sessionID)
 	return nil
@@ -917,89 +915,168 @@ func (sm *SessionManager) SendPromptWithContent(sessionID uuid.UUID, content []C
 		return fmt.Errorf("failed to send query: %w", err)
 	}
 
-	// Get response channel
-	messages := client.ReceiveResponse(session.ctx)
-	logging.Info("SendPromptWithContent: Starting response stream for session %s", sessionID)
-
-	go sm.receiveQueryResponses(session, messages)
+	sm.ensureSessionReader(session, client)
+	logging.Info("SendPromptWithContent: query sent for session %s", sessionID)
 
 	logging.Debug("SendPromptWithContent: Completed successfully for session %s", sessionID)
 	return nil
 }
 
-func (sm *SessionManager) receiveQueryResponses(session *AgentSession, messages <-chan types.Message) {
+// readerSilenceWarning is how long a turn may go quiet, after it has started
+// producing output, before the session reader logs a warning. It only warns.
+// Quiet stretches are normal (extended thinking, a long tool run, a background
+// wait), and the reader used to give up after five minutes of one, marking the
+// session idle while the CLI was still working and leaving the rest of the
+// turn unread until the next prompt. A CLI that exits is noticed because the
+// SDK closes its message stream, not by waiting out a timeout.
+var readerSilenceWarning = 5 * time.Minute
+
+// responseSource yields the messages of one turn. In production it is the
+// client's ReceiveResponse, which ends after the turn's ResultMessage, or when
+// the client closes or its CLI exits. Tests substitute their own.
+type responseSource func(ctx context.Context) <-chan types.Message
+
+// ensureSessionReader makes sure exactly one reader drains client's messages.
+//
+// wee used to start a reader for every prompt, and it stopped at that prompt's
+// ResultMessage. The CLI does not stop there: when a background task finishes
+// it injects a task notification and carries on with a new turn. Nothing read
+// that output. The session showed idle, the messages waited in the SDK's
+// channel, and the next prompt's reader delivered them all at once (up to 45
+// assistant messages within three seconds of a prompt).
+//
+// So the reader now lives as long as the client. A prompt on a client that
+// already has a reader only sends the query, since two readers on one client
+// would split its messages between them. A new client (after a model switch,
+// a reload or an interrupt) gets a fresh reader, and the old one is cancelled
+// and exits without touching the session's status.
+func (sm *SessionManager) ensureSessionReader(session *AgentSession, client *claude.Client) {
+	sm.startSessionReader(session, client, client.ReceiveResponse)
+}
+
+// startSessionReader is ensureSessionReader with an injectable source.
+func (sm *SessionManager) startSessionReader(session *AgentSession, client *claude.Client, source responseSource) {
+	session.readerMu.Lock()
+	defer session.readerMu.Unlock()
+
+	if session.readerClient == client && session.readerCancel != nil {
+		return // already draining this client
+	}
+	if session.readerCancel != nil {
+		session.readerCancel() // the previous client's reader
+	}
+	ctx, cancel := context.WithCancel(session.ctx)
+	session.readerClient = client
+	session.readerCancel = cancel
+	go sm.runSessionReader(ctx, cancel, session, client, source)
+}
+
+// runSessionReader drains one client turn after turn until the client closes,
+// its CLI exits, or the reader is replaced.
+func (sm *SessionManager) runSessionReader(ctx context.Context, cancel context.CancelFunc, session *AgentSession, client *claude.Client, source responseSource) {
+	turnOpen := false
+	defer cancel()
 	defer func() {
 		if r := recover(); r != nil {
-			logging.Error("Session %s: PANIC in receiveQueryResponses: %v", session.ID, r)
-		}
-		sm.mu.Lock()
-		session.Status = SessionStatusIdle
-		session.UpdatedAt = time.Now()
-		// CRITICAL FIX: Save final idle status to database to fix session state race condition
-		// When subprocess dies, the channel closes and we transition to idle, but we must persist this to DB
-		// Otherwise the database still shows "processing" even though the session is actually idle in memory
-		sm.updateSessionInDB(&session.Session)
-		sm.mu.Unlock()
-
-		// PROACTIVE STATE UPDATE: Broadcast final idle state after completion
-		sm.broadcastSessionUpdate(session)
-
-		// MESSAGE RECOVERY: Only resend messages if there were actual delivery failures.
-		// Previously this unconditionally blasted ALL messages from DB on every query completion,
-		// causing a "message storm" (e.g. 321 messages re-broadcast twice) even when streaming
-		// worked perfectly. Now we only recover if messages were dropped (channel timeout fallback).
-		if atomic.LoadInt32(&session.missedMessageCount) > 0 {
-			missed := atomic.SwapInt32(&session.missedMessageCount, 0)
-			logging.Info("Session %s: %d messages used fallback broadcast during streaming, scheduling recovery", session.ID, missed)
-			// Single delayed recovery - gives frontend time to reconnect after WebSocket drop
-			go func() {
-				time.Sleep(5 * time.Second)
-				if err := sm.resendAllMessagesFromDB(session.ID); err != nil {
-					logging.Debug("Session %s: Delayed recovery failed (expected if no connections): %v", session.ID, err)
-				} else {
-					logging.Debug("Session %s: Delayed recovery completed", session.ID)
-				}
-				sm.broadcastSessionUpdate(session)
-			}()
-		} else {
-			logging.Debug("Session %s: All messages delivered normally, skipping recovery", session.ID)
+			logging.Error("Session %s: PANIC in session reader: %v", session.ID, r)
 		}
 
-		// LOOP MODE takes precedence over auto-handoff: if this session is running
-		// an autonomous loop, run verification and decide whether to re-prompt or stop.
-		// Otherwise, check whether the session should auto-handoff to a new session.
-		if sm.isLoopMode(session) {
-			sm.onLoopTurnComplete(session)
-		} else {
-			sm.checkAutoHandoff(session)
+		session.readerMu.Lock()
+		current := session.readerClient == client
+		if current {
+			session.readerClient, session.readerCancel = nil, nil
 		}
+		session.readerMu.Unlock()
 
-		logging.Debug("Session %s: Query response receiving completed", session.ID)
+		// A replaced reader leaves the session alone: its successor may already
+		// be mid-turn. The current reader ending with a turn still open (the CLI
+		// exited, the client closed, the session was interrupted) finishes that
+		// turn so the session does not sit on "processing".
+		sm.mu.RLock()
+		processing := session.Status == SessionStatusProcessing
+		sm.mu.RUnlock()
+		if current && (turnOpen || processing) {
+			sm.completeTurn(session)
+		}
+		logging.Debug("Session %s: session reader stopped", session.ID)
 	}()
 
-	logging.Debug("Session %s: Starting to receive query responses", session.ID)
+	logging.Debug("Session %s: session reader started", session.ID)
+	for {
+		sawResult, sawMessages := sm.readTurn(ctx, session, source(ctx))
+		if sawMessages {
+			turnOpen = true
+		}
+		if !sawResult {
+			return
+		}
+		sm.completeTurn(session)
+		turnOpen = false
+	}
+}
 
+// completeTurn ends a turn: the session goes idle, and the work that used to
+// run when the per-prompt reader exited runs here instead (persisting and
+// broadcasting the idle state, recovering messages that fell back to direct
+// broadcast, and the loop-mode / auto-handoff checks).
+func (sm *SessionManager) completeTurn(session *AgentSession) {
+	if _, changed, err := sm.RefreshGitBranch(session.ID); err == nil && changed {
+		logging.Debug("Session %s: Git branch updated after conversation turn", session.ID)
+	}
+
+	sm.mu.Lock()
+	session.Status = SessionStatusIdle
+	session.UpdatedAt = time.Now()
+	// Persist the idle state, or the database keeps showing "processing".
+	sm.updateSessionInDB(&session.Session)
+	sm.mu.Unlock()
+
+	sm.broadcastSessionUpdate(session)
+
+	// Recover only if messages were actually dropped (they fell back to direct
+	// broadcast when the response channel timed out). Unconditional recovery
+	// used to re-broadcast every message after every turn.
+	if atomic.LoadInt32(&session.missedMessageCount) > 0 {
+		missed := atomic.SwapInt32(&session.missedMessageCount, 0)
+		logging.Info("Session %s: %d messages used fallback broadcast during streaming, scheduling recovery", session.ID, missed)
+		// Single delayed recovery - gives frontend time to reconnect after WebSocket drop
+		go func() {
+			time.Sleep(5 * time.Second)
+			if err := sm.resendAllMessagesFromDB(session.ID); err != nil {
+				logging.Debug("Session %s: Delayed recovery failed (expected if no connections): %v", session.ID, err)
+			} else {
+				logging.Debug("Session %s: Delayed recovery completed", session.ID)
+			}
+			sm.broadcastSessionUpdate(session)
+		}()
+	}
+
+	// Loop mode takes precedence over auto-handoff: a looping session runs its
+	// verification and decides whether to re-prompt or stop.
+	if sm.isLoopMode(session) {
+		sm.onLoopTurnComplete(session)
+	} else {
+		sm.checkAutoHandoff(session)
+	}
+}
+
+// readTurn consumes one turn's stream. It reports whether the stream ended with
+// a ResultMessage (the turn is over and the client can take more) and whether
+// it carried any messages. A stream that closes without a result means the
+// client closed, its CLI exited, or ctx was cancelled.
+func (sm *SessionManager) readTurn(ctx context.Context, session *AgentSession, messages <-chan types.Message) (sawResult, sawMessages bool) {
 	messageCount := 0
-	firstMessageReceived := false
-	timeout := time.After(300 * time.Second) // 5 minute timeout for first message
+	quiet := time.NewTimer(readerSilenceWarning)
+	defer quiet.Stop()
 
 	for {
 		select {
 		case msg, ok := <-messages:
 			if !ok {
-				logging.Info("Session %s: Messages channel closed after %d messages", session.ID, messageCount)
-
-				// Refresh git branch after conversation turn completes
-				if _, changed, err := sm.RefreshGitBranch(session.ID); err == nil && changed {
-					logging.Debug("Session %s: Git branch updated after conversation turn", session.ID)
+				if messageCount > 0 {
+					logging.Info("Session %s: Messages channel closed after %d messages", session.ID, messageCount)
 				}
-
-				// Update session in database before finishing
-				sm.mu.Lock()
-				session.UpdatedAt = time.Now()
-				sm.updateSessionInDB(&session.Session)
-				sm.mu.Unlock()
-				return
+				return sawResult, messageCount > 0
 			}
 
 			messageCount++
@@ -1026,12 +1103,23 @@ func (sm *SessionManager) receiveQueryResponses(session *AgentSession, messages 
 
 			logging.Debug("Session %s: Received message #%d, type: %s", session.ID, messageCount, messageType)
 
-			// PROACTIVE STATE UPDATE: Send state update when first message arrives
-			// This confirms to frontend that processing has actually started
-			if !firstMessageReceived {
-				firstMessageReceived = true
+			// A message arriving while the session is idle means the CLI resumed on
+			// its own, for example after a background task finished: show it as
+			// processing again. The first message of a turn is broadcast either
+			// way, confirming to the frontend that processing has started.
+			sm.mu.Lock()
+			resumed := session.Status != SessionStatusProcessing
+			if resumed {
+				session.Status = SessionStatusProcessing
+				session.UpdatedAt = time.Now()
+				sm.updateSessionInDB(&session.Session)
+			}
+			sm.mu.Unlock()
+			if resumed {
+				logging.Info("Session %s: CLI produced output while idle, back to processing", session.ID)
+			}
+			if resumed || messageCount == 1 {
 				sm.broadcastSessionUpdate(session)
-				logging.Debug("Session %s: First message received, broadcasting processing state", session.ID)
 			}
 
 			// Refresh git branch before forwarding message (especially after tool execution)
@@ -1042,7 +1130,6 @@ func (sm *SessionManager) receiveQueryResponses(session *AgentSession, messages 
 
 			// Only allocate a sequence number for messages that will actually be persisted
 			// This prevents sequence gaps from non-persisted message types (e.g. "result")
-			_ = messageType // already set above in MSG_FLOW logging
 			var sequenceNum int
 			if messageType == "assistant" {
 				sm.mu.Lock()
@@ -1065,8 +1152,9 @@ func (sm *SessionManager) receiveQueryResponses(session *AgentSession, messages 
 			}
 
 			// Check if there's an active streamer consuming the response channel.
-			// If no streamer is active (e.g., SendPromptSilent was called without a frontend handler),
-			// broadcast directly to WebSocket clients instead of writing to the channel.
+			// If none is (SendPromptSilent without a frontend handler, or output
+			// after the prompt's streamer already exited at its result), broadcast
+			// directly to WebSocket clients instead of writing to the channel.
 			// Messages are already persisted to DB above, so this is safe.
 			if atomic.LoadInt32(&session.activeStreamerCount) > 0 {
 				switch sm.sendResponse(session, msg) {
@@ -1074,7 +1162,7 @@ func (sm *SessionManager) receiveQueryResponses(session *AgentSession, messages 
 					logging.Debug("Session %s: Message #%d forwarded to response channel", session.ID, messageCount)
 				case responseAborted:
 					logging.Info("Session %s: Context cancelled after %d messages", session.ID, messageCount)
-					return
+					return false, true
 				default:
 					// The timeout prevents a deadlock when activeStreamerCount > 0
 					// but the reader goroutine has already exited (e.g., WebSocket died).
@@ -1088,6 +1176,10 @@ func (sm *SessionManager) receiveQueryResponses(session *AgentSession, messages 
 				// No active streamer - broadcast directly to avoid channel deadlock
 				logging.Info("Session %s: No active streamer, broadcasting message #%d (type=%s) directly", session.ID, messageCount, messageType)
 				sm.invokeBroadcastMessageCallback(session.ID, msg)
+			}
+
+			if messageType == "result" {
+				sawResult = true
 			}
 
 			// Check if we should reload after this message (from "Allow Similar" flow)
@@ -1117,16 +1209,19 @@ func (sm *SessionManager) receiveQueryResponses(session *AgentSession, messages 
 				}()
 			}
 
-			// Reset timeout after each message
-			timeout = time.After(300 * time.Second)
+			quiet.Reset(readerSilenceWarning)
 
-		case <-timeout:
-			logging.Warning("Session %s: TIMEOUT waiting for messages (received %d so far)", session.ID, messageCount)
-			return
+		case <-quiet.C:
+			// Only a turn that started producing output and then went quiet is
+			// worth a warning. Either way, keep waiting.
+			if messageCount > 0 {
+				logging.Warning("Session %s: no message from the CLI for %s (%d received this turn), still waiting", session.ID, readerSilenceWarning, messageCount)
+			}
+			quiet.Reset(readerSilenceWarning)
 
-		case <-session.ctx.Done():
+		case <-ctx.Done():
 			logging.Info("Session %s: Context cancelled while waiting for messages", session.ID)
-			return
+			return false, messageCount > 0
 		}
 	}
 }

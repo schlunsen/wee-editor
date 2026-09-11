@@ -606,7 +606,7 @@ func (sm *SessionManager) InterruptSession(sessionID uuid.UUID) error {
 	// since both goroutines would be reading from the same channel.
 	//
 	// Order matters: replace session.responseChan FIRST, then close the old one.
-	// This ensures that if receiveQueryResponses enters its select after the replace,
+	// This ensures that if the session reader enters its select after the replace,
 	// it uses the new channel (safe). The old streamFiberResponses holds the old
 	// channel by parameter, so closing it causes its `for msg := range` to exit.
 	swapResponseChan(session)
@@ -614,7 +614,7 @@ func (sm *SessionManager) InterruptSession(sessionID uuid.UUID) error {
 	// Reset activeStreamerCount to 0 to ensure clean state for the next prompt.
 	// The old streamFiberResponses goroutine's defer will try to decrement, but
 	// we don't want a stale count to affect message routing (activeStreamerCount > 0
-	// causes receiveQueryResponses to send to the channel instead of broadcasting directly).
+	// causes the session reader to send to the channel instead of broadcasting directly).
 	if old := atomic.SwapInt32(&session.activeStreamerCount, 0); old != 0 {
 		logging.Warning("Session %s: Reset stale activeStreamerCount from %d to 0 during interrupt", session.ID, old)
 	}

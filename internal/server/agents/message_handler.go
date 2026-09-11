@@ -84,7 +84,7 @@ func (sm *SessionManager) sendPromptInternal(sessionID uuid.UUID, prompt string,
 	// unblocks and exits, then create a fresh channel for the new query.
 	swapResponseChan(session)
 
-	// Reset activeStreamerCount to 0 so the new receiveQueryResponses doesn't
+	// Reset activeStreamerCount to 0 so the session reader doesn't
 	// incorrectly route messages through the channel before the new streamer starts.
 	if old := atomic.SwapInt32(&session.activeStreamerCount, 0); old != 0 {
 		logging.Warning("Session %s: Reset stale activeStreamerCount from %d to 0 before new prompt", session.ID, old)

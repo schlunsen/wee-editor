@@ -828,8 +828,6 @@ func (sm *SessionManager) createPermissionCallback(session *AgentSession) types.
 	}
 }
 
-// receiveQueryResponses receives responses from a Query and sends them to the response channel
-
 // GetResponseChannel returns the response channel for a session
 
 // buildSDKOptions converts SessionOptions to SDK ClaudeAgentOptions

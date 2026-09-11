@@ -115,6 +115,11 @@ type AgentSession struct {
 	codexTurnMu          sync.Mutex         // Protects codexTurnDone
 	respMu               sync.RWMutex       // Guards responseChan: producers RLock while sending, swapResponseChan Locks to swap+close
 
+	// Session reader: one per client, for the client's whole life (see ensureSessionReader).
+	readerMu     sync.Mutex         // Guards readerClient and readerCancel
+	readerClient *claude.Client     // Client being drained; nil when no reader runs
+	readerCancel context.CancelFunc // Stops the session reader
+
 	// Loop mode runtime state (managed by LoopController; not persisted to DB).
 	loopActive    bool       // True while an autonomous loop is running for this session
 	loopStopped   bool       // True once the loop reached a terminal state; blocks auto-restart

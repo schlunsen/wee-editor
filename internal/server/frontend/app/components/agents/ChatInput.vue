@@ -327,6 +327,24 @@ async function handleDrop(event: DragEvent) {
   }
 }
 
+// Decode a File into something drawable.
+//
+// createImageBitmap reads the file directly. The <img> path below needs an
+// object URL, which the app's Content-Security-Policy blocks unless img-src
+// lists blob: — and it did not, so resizing always threw here and every
+// oversized image was rejected instead of shrunk. Decoding the file directly
+// keeps working regardless of the policy.
+async function decodeImage(file: File): Promise<ImageBitmap | HTMLImageElement> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(file)
+    } catch (err) {
+      console.warn('createImageBitmap failed, falling back to an <img> element:', err)
+    }
+  }
+  return loadImage(file)
+}
+
 // Load a File into an <img>, cleaning up its object URL either way.
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -346,7 +364,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
 
 // Draw the image at the given size and encode it.
 function encodeImage(
-  img: HTMLImageElement,
+  img: ImageBitmap | HTMLImageElement,
   width: number,
   height: number,
   type: string,
@@ -384,9 +402,16 @@ async function resizeImage(file: File): Promise<{ blob: Blob; mediaType: string 
   // GIFs are animated: re-encoding through a canvas would keep only one frame.
   if (file.type === 'image/gif') return null
 
-  const img = await loadImage(file)
+  const img = await decodeImage(file)
+  const release = () => {
+    if ('close' in img) img.close()
+  }
+
   const tooLarge = Math.max(img.width, img.height) > MAX_DIMENSION
-  if (!tooLarge && file.size <= MAX_SIZE) return null
+  if (!tooLarge && file.size <= MAX_SIZE) {
+    release()
+    return null
+  }
 
   let width = img.width
   let height = img.height
@@ -427,6 +452,7 @@ async function resizeImage(file: File): Promise<{ blob: Blob; mediaType: string 
           `Image resized: ${img.width}x${img.height} ${(file.size / 1024).toFixed(0)}KB -> ` +
             `${width}x${height} ${(blob.size / 1024).toFixed(0)}KB (${encoding.type})`
         )
+        release()
         return { blob, mediaType: encoding.type }
       }
     }
@@ -438,6 +464,7 @@ async function resizeImage(file: File): Promise<{ blob: Blob; mediaType: string 
 
   // Nothing fit. Hand back the smallest attempt so the caller reports its real
   // size rather than the original's.
+  release()
   return smallest
 }
 
@@ -461,6 +488,7 @@ async function addImageFile(file: File) {
     // Attempt to resize the image if it exceeds max dimensions
     let processFile: File | Blob = file
     let mediaType = file.type
+    let resizeFailure = ''
 
     try {
       const resized = await resizeImage(file)
@@ -469,13 +497,18 @@ async function addImageFile(file: File) {
         mediaType = resized.mediaType
       }
     } catch (resizeErr) {
-      // Resize failed — fall back to original file
+      // Resize failed — fall back to the original file and remember why, so the
+      // message below explains it instead of only reporting a size.
+      resizeFailure = resizeErr instanceof Error ? resizeErr.message : String(resizeErr)
       console.warn('Image resize failed, using original:', resizeErr)
     }
 
     // Validate size after resize
     if (processFile.size > MAX_SIZE) {
-      showImageError(`Image too large: ${(processFile.size / 1024 / 1024).toFixed(1)} MB (max ${(MAX_SIZE / 1024 / 1024).toFixed(1)} MB). Try a smaller image or screenshot.`)
+      const why = resizeFailure ? ` — could not resize it: ${resizeFailure}` : ' after resizing'
+      showImageError(
+        `Image too large: ${(processFile.size / 1024 / 1024).toFixed(1)} MB (max ${(MAX_SIZE / 1024 / 1024).toFixed(1)} MB)${why}. Try a smaller image or screenshot.`
+      )
       return
     }
 

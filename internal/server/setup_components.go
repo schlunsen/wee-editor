@@ -98,7 +98,7 @@ func (s *Server) setupMiddleware() error {
 		c.Set("X-XSS-Protection", "0") // Disabled in favor of CSP
 		c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Set("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
-		c.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; connect-src 'self' blob: wss: ws: https://huggingface.co https://*.huggingface.co https://*.hf.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cdn.jsdelivr.net https://api.iconify.design; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; media-src 'self' blob: data:")
+		c.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' blob: wss: ws: https://huggingface.co https://*.huggingface.co https://*.hf.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co https://cdn.jsdelivr.net https://api.iconify.design; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; media-src 'self' blob: data:")
 		// Set HSTS when behind HTTPS (including ngrok proxy)
 		if s.config.TLS.Enabled || c.Get("X-Forwarded-Proto") == "https" {
 			c.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")

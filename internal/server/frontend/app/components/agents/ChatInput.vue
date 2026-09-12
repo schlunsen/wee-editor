@@ -278,6 +278,7 @@ const filteredHistoryCount = ref(0)
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 const MAX_SIZE = 3.75 * 1024 * 1024 // 3.75 MB
 const MAX_DIMENSION = 1568 // Claude's recommended max dimension
+const MIN_DIMENSION = 320 // do not shrink past this while trying to fit MAX_SIZE
 const JPEG_QUALITY = 0.85
 
 // Character count computed property
@@ -326,75 +327,118 @@ async function handleDrop(event: DragEvent) {
   }
 }
 
-// Resize image if it exceeds max dimensions
-// Returns a { blob, mediaType } with the resized image, or null if no resize needed
-function resizeImage(file: File): Promise<{ blob: Blob; mediaType: string } | null> {
+// Load a File into an <img>, cleaning up its object URL either way.
+function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    // GIFs are animated — skip resizing to preserve animation
-    if (file.type === 'image/gif') {
-      resolve(null)
-      return
-    }
-
     const img = new Image()
     const url = URL.createObjectURL(file)
-
     img.onload = () => {
       URL.revokeObjectURL(url)
-
-      const { width, height } = img
-
-      // No resize needed if within limits
-      if (width <= MAX_DIMENSION && height <= MAX_DIMENSION) {
-        resolve(null)
-        return
-      }
-
-      // Calculate scaled dimensions maintaining aspect ratio
-      const scale = MAX_DIMENSION / Math.max(width, height)
-      const newWidth = Math.round(width * scale)
-      const newHeight = Math.round(height * scale)
-
-      const canvas = document.createElement('canvas')
-      canvas.width = newWidth
-      canvas.height = newHeight
-
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        reject(new Error('Failed to get canvas context'))
-        return
-      }
-
-      // Use high-quality downscaling
-      ctx.imageSmoothingEnabled = true
-      ctx.imageSmoothingQuality = 'high'
-      ctx.drawImage(img, 0, 0, newWidth, newHeight)
-
-      // Use JPEG for opaque images (JPEG, WebP), keep PNG for PNG (may have transparency)
-      const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
-      const quality = outputType === 'image/jpeg' ? JPEG_QUALITY : undefined
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            console.log(`Image resized: ${width}x${height} -> ${newWidth}x${newHeight} (${(file.size / 1024).toFixed(0)}KB -> ${(blob.size / 1024).toFixed(0)}KB)`)
-            resolve({ blob, mediaType: outputType })
-          } else {
-            reject(new Error('Canvas toBlob returned null'))
-          }
-        },
-        outputType,
-        quality
-      )
+      resolve(img)
     }
-
     img.onerror = () => {
       URL.revokeObjectURL(url)
       reject(new Error('Failed to load image for resizing'))
     }
-
     img.src = url
   })
+}
+
+// Draw the image at the given size and encode it.
+function encodeImage(
+  img: HTMLImageElement,
+  width: number,
+  height: number,
+  type: string,
+  quality?: number
+): Promise<Blob | null> {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return Promise.resolve(null)
+
+  // JPEG has no alpha channel: flatten onto white so transparent areas do not
+  // come out black.
+  if (type === 'image/jpeg') {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, width, height)
+  }
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(img, 0, 0, width, height)
+
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), type, quality))
+}
+
+// Shrink an image until it fits MAX_SIZE. Returns null when it already fits.
+//
+// This used to stop at the dimension cap and keep PNG as PNG, which is why a
+// 7.2 MB screenshot was rejected with "Image too large" even though the browser
+// could have shrunk it: a screenshot is a lossless PNG, and at 1568px it can
+// still be several MB. The encoding is now driven by the resulting size —
+// lossless first, then lower JPEG quality, then smaller dimensions — so pasting
+// a large screenshot just works.
+async function resizeImage(file: File): Promise<{ blob: Blob; mediaType: string } | null> {
+  // GIFs are animated: re-encoding through a canvas would keep only one frame.
+  if (file.type === 'image/gif') return null
+
+  const img = await loadImage(file)
+  const tooLarge = Math.max(img.width, img.height) > MAX_DIMENSION
+  if (!tooLarge && file.size <= MAX_SIZE) return null
+
+  let width = img.width
+  let height = img.height
+  if (tooLarge) {
+    const scale = MAX_DIMENSION / Math.max(width, height)
+    width = Math.round(width * scale)
+    height = Math.round(height * scale)
+  }
+
+  // PNG keeps its lossless encoding a chance first; everything else goes
+  // straight to JPEG, which is what actually brings a screenshot down.
+  const encodings: Array<{ type: string; quality?: number }> =
+    file.type === 'image/png'
+      ? [
+          { type: 'image/png' },
+          { type: 'image/jpeg', quality: 0.9 },
+          { type: 'image/jpeg', quality: 0.75 },
+          { type: 'image/jpeg', quality: 0.6 }
+        ]
+      : [
+          { type: 'image/jpeg', quality: JPEG_QUALITY },
+          { type: 'image/jpeg', quality: 0.7 },
+          { type: 'image/jpeg', quality: 0.55 }
+        ]
+
+  let smallest: { blob: Blob; mediaType: string } | null = null
+
+  for (let round = 0; round < 4 && width >= MIN_DIMENSION; round++) {
+    for (const encoding of encodings) {
+      const blob = await encodeImage(img, width, height, encoding.type, encoding.quality)
+      if (!blob) continue
+
+      if (!smallest || blob.size < smallest.blob.size) {
+        smallest = { blob, mediaType: encoding.type }
+      }
+      if (blob.size <= MAX_SIZE) {
+        console.log(
+          `Image resized: ${img.width}x${img.height} ${(file.size / 1024).toFixed(0)}KB -> ` +
+            `${width}x${height} ${(blob.size / 1024).toFixed(0)}KB (${encoding.type})`
+        )
+        return { blob, mediaType: encoding.type }
+      }
+    }
+
+    // Still too big at this size: shrink and try the encodings again.
+    width = Math.round(width * 0.75)
+    height = Math.round(height * 0.75)
+  }
+
+  // Nothing fit. Hand back the smallest attempt so the caller reports its real
+  // size rather than the original's.
+  return smallest
 }
 
 // Add image file to attachments
@@ -405,9 +449,11 @@ async function addImageFile(file: File) {
     return
   }
 
-  // Validate size before resize (reject truly enormous files early)
-  if (file.size > MAX_SIZE * 4) {
-    showImageError(`Image too large: ${(file.size / 1024 / 1024).toFixed(1)} MB. Try a smaller image or screenshot.`)
+  // Anything past this is refused before decoding it: the browser would have to
+  // hold the full bitmap in memory to shrink it. Everything below is resized to
+  // fit rather than rejected.
+  if (file.size > MAX_SIZE * 8) {
+    showImageError(`Image too large to process: ${(file.size / 1024 / 1024).toFixed(1)} MB. Try a smaller image or screenshot.`)
     return
   }
 

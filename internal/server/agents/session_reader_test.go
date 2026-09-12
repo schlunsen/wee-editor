@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -234,5 +235,55 @@ func TestSessionReaderCompletesATurnOnce(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if n := atomic.LoadInt32(&updates); n != settled {
 		t.Fatalf("the turn was completed again on exit: %d session updates, want %d", n, settled)
+	}
+}
+
+// A failing provider used to look exactly like a long turn. The CLI retries
+// HTTP errors (Z.ai returns an expired GLM plan as a 429) up to ten times,
+// reporting each as an api_retry system message that nothing rendered, so the
+// session just span. One notice per turn now explains it.
+func TestSessionReaderReportsProviderRetries(t *testing.T) {
+	f := newReaderFixture(t)
+	turns := newFakeTurns()
+	f.setStatus(SessionStatusProcessing)
+	t1 := turns.turn()
+	f.sm.startSessionReader(f.s, &claude.Client{}, turns.source)
+
+	retry := func(attempt int) *types.SystemMessage {
+		return &types.SystemMessage{Type: "system", Subtype: "api_retry", Data: map[string]interface{}{
+			"attempt": float64(attempt), "max_retries": float64(10), "error_status": float64(429), "error": "rate_limit",
+		}}
+	}
+	t1 <- retry(1)
+	t1 <- retry(2)
+	t1 <- retry(3)
+
+	notices := func() []string {
+		recs, _, err := f.sm.GetMessages(f.s.ID, 100, 0)
+		if err != nil {
+			t.Fatalf("GetMessages: %v", err)
+		}
+		var out []string
+		for _, r := range recs {
+			if strings.Contains(r.Content, "is not answering") {
+				out = append(out, r.Content)
+			}
+		}
+		return out
+	}
+	waitFor(t, "a notice explaining the provider failure", func() bool { return len(notices()) == 1 })
+
+	got := notices()[0]
+	for _, want := range []string{"HTTP 429", "rate_limit", "attempt 1 of 10"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("notice %q does not mention %q", got, want)
+		}
+	}
+
+	t1 <- readerResult()
+	close(t1)
+	waitFor(t, "idle after the turn", f.statusIs(SessionStatusIdle))
+	if n := len(notices()); n != 1 {
+		t.Errorf("got %d notices for one turn, want 1 (retries must not spam the conversation)", n)
 	}
 }

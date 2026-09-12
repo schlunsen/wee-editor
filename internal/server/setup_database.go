@@ -121,7 +121,7 @@ func (s *Server) seedKnownProvidersFromEnv() {
 			providerID:   "deepseek",
 			name:         "DeepSeek",
 			baseURL:      "https://api.deepseek.com/anthropic",
-			defaultModel: "deepseek-chat",
+			defaultModel: "deepseek-v4-pro",
 		},
 		{
 			envVar:       "WEE_GLM_API_KEY",

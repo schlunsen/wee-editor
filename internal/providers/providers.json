@@ -34,19 +34,12 @@
       "base_url": "https://api.deepseek.com/anthropic",
       "icon": "🔮",
       "models": [
+        "deepseek-v4-pro",
+        "deepseek-flash",
         "deepseek-chat",
-        "deepseek-reasoner",
-        "DeepSeek-V3.2-Speciale",
-        "DeepSeek-V3.2-Exp",
-        "DeepSeek-V3.1",
-        "DeepSeek-V3.1-Terminus",
-        "DeepSeek-V3-Base",
-        "DeepSeek-V3",
-        "DeepSeek-R1",
-        "DeepSeek-R1-Zero",
-        "DeepSeek-R1-Lite"
+        "deepseek-reasoner"
       ],
-      "default_model": "deepseek-chat",
+      "default_model": "deepseek-v4-pro",
       "description": "DeepSeek AI models with Anthropic API compatibility"
     },
     {

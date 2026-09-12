@@ -206,8 +206,11 @@ export function useMessageHelpers() {
         return ''
       }
 
-      // Handle system messages
+      // Handle system messages. Notices the server generates (a failing
+      // provider, for example) carry their text in data.text; anything else
+      // falls back to naming the subtype.
       if (content.type === 'system') {
+        if (content.data?.text) return String(content.data.text)
         return `SystemMessage: ${content.subtype || 'unknown'}`
       }
 

@@ -1015,6 +1015,71 @@ func (sm *SessionManager) runSessionReader(ctx context.Context, cancel context.C
 	}
 }
 
+// providerRetryNotice describes a failing provider in one line.
+//
+// The CLI reports each retry as a system message with subtype "api_retry",
+// carrying the HTTP status and attempt count. Those details are top-level
+// fields the SDK does not keep yet (claude-agent-sdk-go), so the text degrades
+// gracefully when they are missing and fills in as soon as they arrive.
+func providerRetryNotice(session *AgentSession, data map[string]interface{}) string {
+	num := func(k string) int {
+		if v, ok := data[k].(float64); ok {
+			return int(v)
+		}
+		return 0
+	}
+	str := func(k string) string {
+		if v, ok := data[k].(string); ok {
+			return v
+		}
+		return ""
+	}
+
+	provider := session.Provider
+	if provider == "" {
+		provider = "The provider"
+	}
+	notice := fmt.Sprintf("⏳ %s is not answering", provider)
+	if status := num("error_status"); status > 0 {
+		notice += fmt.Sprintf(" (HTTP %d", status)
+		if kind := str("error"); kind != "" {
+			notice += ": " + kind
+		}
+		notice += ")"
+	}
+	if max := num("max_retries"); max > 0 {
+		notice += fmt.Sprintf(" — retrying, attempt %d of %d", num("attempt"), max)
+	} else {
+		notice += " — the CLI is retrying with backoff"
+	}
+	return notice + ". Check the provider's status, plan or rate limits if this keeps up."
+}
+
+// emitSessionNotice records a server-generated note in the conversation and
+// pushes it to connected clients, the way the interrupt and model-switch notes
+// are recorded.
+func (sm *SessionManager) emitSessionNotice(session *AgentSession, text string) {
+	sm.mu.Lock()
+	session.MessageCount++
+	seq := session.MessageCount
+	sm.mu.Unlock()
+
+	if err := sm.saveMessageToDB(session.ID, seq, "system", text, "", nil, nil); err != nil {
+		logging.Warning("Session %s: failed to save notice: %v", session.ID, err)
+		sm.mu.Lock()
+		session.MessageCount--
+		sm.mu.Unlock()
+		return
+	}
+
+	logging.Info("Session %s: %s", session.ID, text)
+	sm.invokeBroadcastMessageCallback(session.ID, &types.SystemMessage{
+		Type:    "system",
+		Subtype: "notice",
+		Data:    map[string]interface{}{"text": text},
+	})
+}
+
 // completeTurn ends a turn: the session goes idle, and the work that used to
 // run when the per-prompt reader exited runs here instead (persisting and
 // broadcasting the idle state, recovering messages that fell back to direct
@@ -1066,6 +1131,7 @@ func (sm *SessionManager) completeTurn(session *AgentSession) {
 // client closed, its CLI exited, or ctx was cancelled.
 func (sm *SessionManager) readTurn(ctx context.Context, session *AgentSession, messages <-chan types.Message) (sawResult, sawMessages bool) {
 	messageCount := 0
+	retryNoticed := false
 	quiet := time.NewTimer(readerSilenceWarning)
 	defer quiet.Stop()
 
@@ -1102,6 +1168,15 @@ func (sm *SessionManager) readTurn(ctx context.Context, session *AgentSession, m
 			}
 
 			logging.Debug("Session %s: Received message #%d, type: %s", session.ID, messageCount, messageType)
+
+			// A provider that is failing must not look like a long turn. The CLI
+			// retries HTTP errors up to ten times with growing backoff and says
+			// nothing the frontend renders, so an outage showed up as a spinner
+			// and nothing else. One notice per turn is enough to explain it.
+			if sysMsg, ok := msg.(*types.SystemMessage); ok && sysMsg.Subtype == "api_retry" && !retryNoticed {
+				retryNoticed = true
+				sm.emitSessionNotice(session, providerRetryNotice(session, sysMsg.Data))
+			}
 
 			// A message arriving while the session is idle means the CLI resumed on
 			// its own, for example after a background task finished: show it as

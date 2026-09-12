@@ -132,14 +132,8 @@ func isValidModelForProvider(provider, model string) bool {
 		}
 	case "deepseek":
 		validModels := []string{
-			"DeepSeek-V3.2-Exp",
-			"DeepSeek-V3.1",
-			"DeepSeek-V3.1-Terminus",
-			"DeepSeek-V3-Base",
-			"DeepSeek-V3",
-			"DeepSeek-R1",
-			"DeepSeek-R1-Zero",
-			"DeepSeek-R1-Lite",
+			"deepseek-v4-pro",
+			"deepseek-flash",
 			"deepseek-chat",
 			"deepseek-reasoner",
 		}

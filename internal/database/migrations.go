@@ -1607,6 +1607,59 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version:     40,
+		Description: "Sync DeepSeek models with the provider's live model list",
+		Up: func(tx *sql.Tx) error {
+			// Verified on 2026-09-12 against https://api.deepseek.com/models and the
+			// Anthropic-compatible endpoint wee actually calls. The V3 and R1
+			// generations are gone: DeepSeek rejects them with "The supported API
+			// model names are deepseek-flash, deepseek-v4-pro", so nine of the
+			// eleven entries in the picker were dead options. deepseek-chat and
+			// deepseek-reasoner still work as aliases (both served by
+			// deepseek-v4-flash) and are kept.
+			models := []string{"deepseek-v4-pro", "deepseek-flash", "deepseek-chat", "deepseek-reasoner"}
+			modelsJSON, err := json.Marshal(models)
+			if err != nil {
+				return fmt.Errorf("failed to marshal DeepSeek models: %w", err)
+			}
+			if _, err := tx.Exec(`
+				UPDATE providers
+				SET models = ?, default_model = 'deepseek-v4-pro', updated_at = CURRENT_TIMESTAMP
+				WHERE provider_id = 'deepseek'
+			`, string(modelsJSON)); err != nil {
+				return fmt.Errorf("failed to update DeepSeek models: %w", err)
+			}
+
+			// Anything still pinned to a retired id would fail on its next request.
+			retired := []any{"deepseek-v4-pro", "DeepSeek-V3.2-Speciale", "DeepSeek-V3.2-Exp",
+				"DeepSeek-V3.1", "DeepSeek-V3.1-Terminus", "DeepSeek-V3-Base", "DeepSeek-V3",
+				"DeepSeek-R1", "DeepSeek-R1-Zero", "DeepSeek-R1-Lite"}
+			placeholders := ""
+			for i := 1; i < len(retired); i++ {
+				if i > 1 {
+					placeholders += ", "
+				}
+				placeholders += "?"
+			}
+			if _, err := tx.Exec(fmt.Sprintf(`
+				UPDATE providers
+				SET model_name = ?, updated_at = CURRENT_TIMESTAMP
+				WHERE provider_id = 'deepseek' AND model_name IN (%s)
+			`, placeholders), retired...); err != nil {
+				return fmt.Errorf("failed to repoint DeepSeek provider model: %w", err)
+			}
+			if _, err := tx.Exec(fmt.Sprintf(`
+				UPDATE agent_sessions
+				SET model_name = ?
+				WHERE provider = 'deepseek' AND model_name IN (%s)
+			`, placeholders), retired...); err != nil {
+				return fmt.Errorf("failed to repoint DeepSeek sessions: %w", err)
+			}
+
+			return nil
+		},
+	},
 }
 
 // runMigrations runs all pending database migrations

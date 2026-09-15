@@ -14,37 +14,35 @@ default:
 
 # Build the application (with frontend)
 build: build-frontend build-go
+    @echo "🎉 {{wee}} is ready: ./{{wee}}"
 
-# Build frontend only
-[unix]
-build-frontend:
-    @echo "Building Nuxt frontend..."
-    @if [ ! -d "{{frontend_dir}}/node_modules" ]; then \
-        echo "📦 Installing frontend dependencies..."; \
-        npm --prefix {{frontend_dir}} install; \
-    fi
-    @npm --prefix {{frontend_dir}} run generate
-    @echo "✅ Frontend build complete"
+# Every build/test recipe below runs through a wrapper in scripts/ that hides the
+# thousands of lines of tool chatter and prints a short summary instead. The
+# complete output always lands in dist/logs/<name>.log — read it with
+# `just logs`, or stream it live with the matching *-verbose recipe.
 
-[windows]
+# Build frontend only — summarises Nuxt/Vite warnings, routes, output size
 build-frontend:
-    @echo "Building Nuxt frontend..."
-    @if (-not (Test-Path "{{frontend_dir}}/node_modules")) { echo "📦 Installing frontend dependencies..."; npm --prefix {{frontend_dir}} install }
-    @npm --prefix {{frontend_dir}} run generate
-    @echo "✅ Frontend build complete"
+    @node scripts/build-frontend.mjs
+
+# Build frontend with the complete Nuxt/Vite output streamed live
+build-frontend-verbose:
+    @node scripts/build-frontend.mjs --verbose
 
 # Build Go binary only (assumes frontend already built)
-[unix]
 build-go:
-    @echo "Building wee..."
-    @go build -o {{wee}} ./cmd/wee
-    @echo "✅ Build complete: ./{{wee}}"
+    @node scripts/build-go.mjs
 
-[windows]
-build-go:
-    @echo "Building wee..."
-    @$env:CGO_ENABLED = "1"; go build -o {{wee}} ./cmd/wee
-    @echo "✅ Build complete: {{wee}}"
+# Build Go with the complete compiler output streamed live
+build-go-verbose:
+    @node scripts/build-go.mjs --verbose
+
+# Build everything with the complete output
+build-verbose: build-frontend-verbose build-go-verbose
+
+# List the build/test logs, or print one: just logs go-test
+logs name="":
+    @node scripts/logs.mjs {{name}}
 
 # Run the application
 run:
@@ -64,9 +62,7 @@ frontend-build: build-frontend
 
 # Install Nuxt frontend dependencies
 frontend-install:
-    @echo "Installing frontend dependencies..."
-    @npm --prefix {{frontend_dir}} install
-    @echo "✅ Frontend dependencies installed"
+    @node scripts/build-frontend.mjs --install
 
 # Full development workflow: build frontend then start analytics
 dev-full: build-frontend build-go analytics
@@ -181,57 +177,22 @@ install:
     @go install ./cmd/wee
     @echo "✅ Installed to GOPATH/bin"
 
-# Run all tests
-test:
-    @echo "Running tests..."
-    @go test -v ./...
+# Run all tests — one line per package, plus any failing tests and assertions
+test *packages:
+    @node scripts/go-test.mjs {{packages}}
 
-# Run tests with coverage
-[unix]
-test-coverage:
-    @echo "Running tests with coverage..."
-    @go test -v -coverprofile=coverage.out -covermode=atomic ./...
-    @go tool cover -html=coverage.out -o coverage.html
-    @echo ""
-    @echo "📊 Coverage Summary:"
-    @echo "   Total Coverage: $(go tool cover -func=coverage.out | tail -1 | grep -oE '[0-9]+\.[0-9]+%')"
-    @echo ""
-    @echo "✅ Coverage report generated:"
-    @echo "   HTML: coverage.html"
-    @echo "   Data: coverage.out"
+# Run tests with the complete output streamed live
+test-verbose *packages:
+    @node scripts/go-test.mjs --verbose {{packages}}
 
-[windows]
-test-coverage:
-    @echo "Running tests with coverage..."
-    @go test -v -coverprofile=coverage.out -covermode=atomic ./...
-    @go tool cover -html=coverage.out -o coverage.html
-    @echo ""
-    @echo "✅ Coverage report generated:"
-    @echo "   HTML: coverage.html"
-    @echo "   Data: coverage.out"
+# Run tests with coverage (coverage.out + coverage.html)
+test-coverage *packages:
+    @node scripts/go-test.mjs --coverage {{packages}}
 
-# Build for all platforms
-[unix]
-build-all: build-frontend
-    @echo "Building for multiple platforms..."
-    @mkdir -p dist
-    @GOOS=linux GOARCH=amd64 go build -o dist/wee-linux-amd64 ./cmd/wee
-    @GOOS=linux GOARCH=arm64 go build -o dist/wee-linux-arm64 ./cmd/wee
-    @GOOS=darwin GOARCH=amd64 go build -o dist/wee-darwin-amd64 ./cmd/wee
-    @GOOS=darwin GOARCH=arm64 go build -o dist/wee-darwin-arm64 ./cmd/wee
-    @GOOS=windows GOARCH=amd64 go build -o dist/wee-windows-amd64.exe ./cmd/wee
-    @echo "✅ Build complete for all platforms in ./dist/"
-
-[windows]
-build-all: build-frontend
-    @echo "Building for multiple platforms..."
-    @if (-not (Test-Path dist)) { New-Item -ItemType Directory -Path dist | Out-Null }
-    @$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o dist/wee-linux-amd64 ./cmd/wee
-    @$env:GOOS="linux"; $env:GOARCH="arm64"; go build -o dist/wee-linux-arm64 ./cmd/wee
-    @$env:GOOS="darwin"; $env:GOARCH="amd64"; go build -o dist/wee-darwin-amd64 ./cmd/wee
-    @$env:GOOS="darwin"; $env:GOARCH="arm64"; go build -o dist/wee-darwin-arm64 ./cmd/wee
-    @$env:GOOS="windows"; $env:GOARCH="amd64"; go build -o dist/wee-windows-amd64.exe ./cmd/wee
-    @echo "✅ Build complete for all platforms in ./dist/"
+# Build for all platforms — a size per target, or the reason it can't be built
+# (cross-compiling needs cgo, so only the host target works outside CI)
+build-all *targets: build-frontend
+    @node scripts/build-all.mjs {{targets}}
 
 # Format code
 fmt:
@@ -242,25 +203,17 @@ fmt:
 # Format code (alias for fmt)
 format: fmt
 
-# Lint code
-[unix]
+# Lint code — golangci-lint when installed, else `go vet`; findings grouped by linter
 lint:
-    @echo "Linting code..."
-    @golangci-lint run || go vet ./...
-    @echo "✅ Lint complete"
+    @node scripts/go-lint.mjs
 
-[windows]
-lint:
-    @echo "Linting code..."
-    @go vet ./...
-    @echo "✅ Lint complete"
+# Lint without failing the recipe when issues are found
+lint-report:
+    @node scripts/go-lint.mjs --no-fail
 
-# Download and tidy dependencies
+# Download and tidy dependencies — reports whether go.mod/go.sum moved
 deps:
-    @echo "Downloading dependencies..."
-    @go mod download
-    @go mod tidy
-    @echo "✅ Dependencies updated"
+    @node scripts/go-deps.mjs
 
 # Run the app with verbose logging
 verbose:

@@ -66,14 +66,14 @@
               <div class="metric-content">
                 <div class="metric-label yolo-header">
                   <Icon name="mdi:alert-circle" class="warning-icon" size="20" />
-                  <span>Skip approval prompts</span>
+                  <span>YOLO Mode</span>
                 </div>
 
                 <div class="yolo-toggle-container">
                   <label class="yolo-toggle">
                     <input
                       type="checkbox"
-                      aria-label="Skip approval prompts"
+                      aria-label="YOLO Mode"
                       :checked="yoloModeEnabled"
                       @change="toggleYOLOMode"
                       :disabled="!session"
@@ -427,7 +427,7 @@ const toggleYOLOMode = async (event?: Event) => {
   // Show confirmation dialog when enabling
   if (newState) {
     const confirmed = window.confirm(
-      'Skip approval prompts?\n\n' +
+      'Enable YOLO Mode?\n\n' +
       'This will restart the session with ALL permissions bypassed.\n' +
       'The conversation history will be preserved.\n\n' +
       'Only use in sandboxed environments with no internet access.\n\n' +

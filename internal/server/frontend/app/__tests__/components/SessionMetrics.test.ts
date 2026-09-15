@@ -33,7 +33,7 @@ it('keeps approval skipping off when confirmation is cancelled', async () => {
   const confirm = vi.fn(() => false)
   window.confirm = confirm
   const wrapper = mount(SessionMetrics, { props: { session: { id: 'test', status: 'idle', message_count: 0, options: {} } }, global: { provide: { agentWs: { send, off: vi.fn() } }, stubs: { Icon: true, ProjectPermissions: true, ContextUsageBar: true, GitStatus: true } } })
-  const checkbox = wrapper.get<HTMLInputElement>('input[aria-label="Skip approval prompts"]')
+  const checkbox = wrapper.get<HTMLInputElement>('input[aria-label="YOLO Mode"]')
   await checkbox.setValue(true)
   expect(confirm).toHaveBeenCalledOnce()
   expect(send).not.toHaveBeenCalled()

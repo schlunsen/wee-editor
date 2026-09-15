@@ -50,6 +50,7 @@
           <div class="carousel-controls">
             <button
               @click="scrollLeft"
+              aria-label="Previous themes"
               class="carousel-arrow"
               :class="{ 'disabled': scrollPosition <= 0 }"
               :disabled="scrollPosition <= 0"
@@ -60,6 +61,7 @@
             </button>
             <button
               @click="scrollRight"
+              aria-label="Next themes"
               class="carousel-arrow"
               :class="{ 'disabled': scrollPosition >= maxScroll }"
               :disabled="scrollPosition >= maxScroll"
@@ -80,6 +82,12 @@
               v-for="theme in availableThemes"
               :key="theme.id"
               class="theme-card"
+              role="button"
+              tabindex="0"
+              :aria-pressed="currentTheme === theme.id"
+              :aria-label="`Apply ${theme.name}`"
+              @keydown.enter.prevent="selectTheme(theme.id)"
+              @keydown.space.prevent="selectTheme(theme.id)"
               :class="{ 'theme-card-active': currentTheme === theme.id }"
               @click="selectTheme(theme.id)"
             >
@@ -129,23 +137,23 @@
         <div class="palette-grid">
           <div class="palette-item">
             <div class="palette-color" style="background: var(--accent-purple)"></div>
-            <span>Purple</span>
+            <span>Primary</span>
           </div>
           <div class="palette-item">
             <div class="palette-color" style="background: var(--accent-cyan)"></div>
-            <span>Cyan</span>
+            <span>Secondary</span>
           </div>
           <div class="palette-item">
             <div class="palette-color" style="background: var(--accent-green)"></div>
-            <span>Green</span>
+            <span>Success</span>
           </div>
           <div class="palette-item">
             <div class="palette-color" style="background: var(--accent-yellow)"></div>
-            <span>Yellow</span>
+            <span>Warning</span>
           </div>
           <div class="palette-item">
             <div class="palette-color" style="background: var(--accent-orange)"></div>
-            <span>Orange</span>
+            <span>Attention</span>
           </div>
         </div>
       </section>
@@ -261,6 +269,12 @@ header h1 {
   letter-spacing: -0.01em;
 }
 
+.theme-card:focus-visible,
+.carousel-arrow:focus-visible {
+  outline: 3px solid var(--accent-purple);
+  outline-offset: 3px;
+}
+
 /* Current Theme Display */
 .current-theme-display {
   display: flex;
@@ -368,7 +382,7 @@ header h1 {
 .carousel-arrow:hover:not(.disabled) {
   background: var(--accent-purple);
   border-color: var(--accent-purple);
-  color: white;
+  color: var(--bg-primary);
   transform: scale(1.1);
 }
 
@@ -430,7 +444,7 @@ header h1 {
 .theme-card:hover {
   transform: translateY(-4px);
   border-color: var(--accent-purple);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px var(--shadow-color);
 }
 
 .theme-card-active {

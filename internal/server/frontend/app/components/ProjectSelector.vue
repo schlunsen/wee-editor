@@ -4,11 +4,13 @@
       @click="toggleDropdown"
       class="selector-button"
       :class="{ 'selector-button-active': showDropdown }"
-      :style="selectorStyle"
+      :aria-expanded="showDropdown"
+      :aria-label="`Select project: ${currentProject?.name || 'No Project'}`"
     >
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
       </svg>
+      <span v-if="currentProject?.color" class="selector-color-dot" :style="{ backgroundColor: currentProject.color }" aria-hidden="true"></span>
       <span class="current-project">{{ currentProject?.name || 'No Project' }}</span>
       <svg class="chevron" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -96,7 +98,7 @@
                 <span class="mobile-project-name">{{ project.name }}</span>
                 <span class="mobile-project-path">{{ project.path }}</span>
               </div>
-              <svg v-if="currentProject?.id === project.id" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style="color: #a78bfa; flex-shrink: 0;">
+              <svg v-if="currentProject?.id === project.id" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style="color: var(--accent-purple); flex-shrink: 0;">
                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
               </svg>
             </div>
@@ -161,18 +163,6 @@ const currentProject = computed(() => {
   }
 
   return null
-})
-
-// Apply project color as background on selector button
-const selectorStyle = computed(() => {
-  const color = currentProject.value?.color
-  if (!color) return {}
-  return {
-    background: color,
-    borderColor: color,
-    boxShadow: `0 0 12px ${color}66, 0 0 4px ${color}44`,
-    color: '#ffffff',
-  }
 })
 
 const toggleDropdown = () => {
@@ -259,6 +249,8 @@ onUnmounted(() => {
   border-radius: 0.5rem;
   color: var(--text-primary);
   font-size: 0.85rem;
+  font-family: inherit;
+  min-height: 36px;
   cursor: pointer;
   transition: all 0.2s;
   max-width: 200px;
@@ -269,8 +261,17 @@ onUnmounted(() => {
   border-color: var(--accent-purple);
 }
 
-.selector-button[style*="background"]:hover {
-  filter: brightness(1.2);
+.selector-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px var(--overlay-border);
+}
+
+.selector-button:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
 }
 
 .selector-button-active {
@@ -281,6 +282,7 @@ onUnmounted(() => {
 .icon {
   width: 1.25rem;
   height: 1.25rem;
+  flex-shrink: 0;
 }
 
 .current-project {
@@ -295,6 +297,7 @@ onUnmounted(() => {
 .chevron {
   width: 1rem;
   height: 1rem;
+  flex-shrink: 0;
   opacity: 0.6;
 }
 
@@ -464,7 +467,7 @@ onUnmounted(() => {
 .new-button {
   background: var(--accent-purple);
   border: 1px solid var(--accent-purple);
-  color: white;
+  color: var(--bg-primary);
 }
 
 .new-button:hover {
@@ -475,6 +478,7 @@ onUnmounted(() => {
 .new-button .icon {
   width: 1rem;
   height: 1rem;
+  flex-shrink: 0;
 }
 
 /* Mobile: compact selector button */
@@ -533,8 +537,8 @@ onUnmounted(() => {
 .mobile-project-modal {
   width: 100%;
   max-height: 80vh;
-  background: #1c1c24;
-  border: 1px solid #2d2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 1rem;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   overflow: hidden;
@@ -547,7 +551,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  border-bottom: 1px solid #2d2d3a;
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
@@ -555,15 +559,15 @@ onUnmounted(() => {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #e8e8e8;
+  color: var(--text-primary);
 }
 
 .mobile-project-manage-btn {
   padding: 0.375rem 0.875rem;
   background: transparent;
-  border: 1px solid #2d2d3a;
+  border: 1px solid var(--border-color);
   border-radius: 0.375rem;
-  color: #a8a8b2;
+  color: var(--text-secondary);
   font-size: 0.8rem;
   cursor: pointer;
 }
@@ -588,7 +592,7 @@ onUnmounted(() => {
 }
 
 .mobile-project-item:active {
-  background: #24242e;
+  background: var(--card-hover);
 }
 
 .mobile-project-item-active {
@@ -613,19 +617,19 @@ onUnmounted(() => {
 .mobile-project-name {
   font-weight: 500;
   font-size: 0.9rem;
-  color: #e8e8e8;
+  color: var(--text-primary);
 }
 
 .mobile-project-path {
   font-size: 0.7rem;
-  color: #a8a8b2;
+  color: var(--text-secondary);
   word-break: break-all;
 }
 
 .mobile-project-empty {
   padding: 2rem 1rem;
   text-align: center;
-  color: #a8a8b2;
+  color: var(--text-secondary);
 }
 
 .mobile-project-footer {
@@ -633,7 +637,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  border-top: 1px solid #2d2d3a;
+  border-top: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
@@ -643,9 +647,9 @@ onUnmounted(() => {
   justify-content: center;
   padding: 0.75rem;
   background: transparent;
-  border: 1px solid #2d2d3a;
+  border: 1px solid var(--border-color);
   border-radius: 0.5rem;
-  color: #a8a8b2;
+  color: var(--text-secondary);
   font-size: 0.875rem;
   cursor: pointer;
   min-height: 44px;
@@ -659,7 +663,7 @@ onUnmounted(() => {
   background: var(--accent-purple, #a78bfa);
   border: 1px solid var(--accent-purple, #a78bfa);
   border-radius: 0.5rem;
-  color: white;
+  color: var(--bg-primary);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;

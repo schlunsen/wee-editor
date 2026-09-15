@@ -62,9 +62,7 @@ frontend-build: build-frontend
 
 # Install Nuxt frontend dependencies
 frontend-install:
-    @echo "Installing frontend dependencies..."
-    @npm --prefix {{frontend_dir}} install
-    @echo "✅ Frontend dependencies installed"
+    @node scripts/build-frontend.mjs --install
 
 # Full development workflow: build frontend then start analytics
 dev-full: build-frontend build-go analytics

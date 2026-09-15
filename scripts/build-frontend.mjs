@@ -11,6 +11,7 @@
  *   node scripts/build-frontend.mjs --verbose    # stream everything live
  *   node scripts/build-frontend.mjs --show-log   # print the last build log
  *   node scripts/build-frontend.mjs --no-warnings
+ *   node scripts/build-frontend.mjs --install    # dependencies only
  *
  * Env:
  *   WEE_BUILD_VERBOSE=1   same as --verbose
@@ -56,7 +57,8 @@ async function main() {
   if (opts.showLog) return showLog(process.env.WEE_BUILD_LOG || 'frontend-build');
 
   const started = Date.now();
-  if (!opts.quiet) header('🎨 Building frontend', '(Nuxt → static)');
+  const installOnly = opts.has('--install', '--deps');
+  if (!opts.quiet && !installOnly) header('🎨 Building frontend', '(Nuxt → static)');
 
   if (!fs.existsSync(FRONTEND_DIR)) {
     console.error(`${red('✗')} Frontend directory not found: ${rel(FRONTEND_DIR)}`);
@@ -64,14 +66,13 @@ async function main() {
     process.exit(1);
   }
 
-  // 1. Dependencies (only when missing).
+  // 1. Dependencies (only when missing, or always with --install).
+  if (installOnly) {
+    await installDeps(logPath('frontend-install'));
+    process.exit(0);
+  }
   if (!fs.existsSync(path.join(FRONTEND_DIR, 'node_modules'))) {
-    const { code } = await runStep('📦 Installing frontend dependencies', 'npm', ['install'], {
-      cwd: FRONTEND_DIR,
-      logPath: LOG,
-      verbose: opts.verbose,
-    });
-    if (code !== 0) return fail(code, 'Dependency installation failed', { logPath: LOG });
+    await installDeps();
   }
 
   // 2. The actual build.
@@ -104,6 +105,48 @@ async function main() {
   });
   if (opts.verbose) console.log(dim(`   full log: ${rel(LOG)}`));
   console.log('');
+}
+
+// ── dependencies ─────────────────────────────────────────────────────────────
+
+/**
+ * Run `npm install` and report what it did — npm buries "added 1,234 packages
+ * in 42s" (or "up to date") among its funding notices and audit summary.
+ * Exits the process on failure; returns true otherwise.
+ */
+async function installDeps(log = LOG) {
+  let summary = null;
+  let noisy = 0;
+
+  const { code, elapsed } = await runStep('📦 Installing frontend dependencies', 'npm', ['install'], {
+    cwd: FRONTEND_DIR,
+    logPath: log,
+    verbose: opts.verbose,
+    onLine: (line) => {
+      const t = line.trim();
+      if (/^(added|removed|changed|up to date)/i.test(t)) summary = t;
+      else if (/packages? are looking for funding|vulnerabilit|npm notice/i.test(t)) noisy++;
+    },
+  });
+
+  if (code !== 0) {
+    fail(code, 'Dependency installation failed', { logPath: log });
+    return false;
+  }
+
+  // The build path installs silently; only --install prints its own summary.
+  if (opts.has('--install', '--deps')) {
+    console.log(`\n${green('✅')} ${bold('Dependencies installed')}`);
+    console.log(`   ${dim(summary || `in ${(elapsed / 1000).toFixed(1)}s`)}`);
+    if (noisy) {
+      console.log(`   ${dim(`ℹ  ${noisy} funding/audit notices suppressed — see the log`)}`);
+    }
+    console.log('');
+    console.log(`   ${dim(`full log: ${rel(log)}`)}`);
+    console.log('');
+  }
+
+  return true;
 }
 
 // ── warning digest ───────────────────────────────────────────────────────────

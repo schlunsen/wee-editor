@@ -23,8 +23,11 @@
           </div>
 
           <!-- Settings dropdown -->
-          <div class="settings-menu" ref="settingsMenuRef">
+          <div class="settings-menu" ref="settingsMenuRef" @keydown.esc.stop.prevent="closeSettingsMenu(); settingsButtonRef?.focus()">
             <button
+              ref="settingsButtonRef"
+              :aria-expanded="showSettingsMenu"
+              aria-controls="header-settings"
               @click="toggleSettingsMenu"
               class="settings-button"
               :class="{ 'settings-button-active': showSettingsMenu }"
@@ -41,7 +44,7 @@
               </svg>
             </button>
 
-            <div v-if="showSettingsMenu" class="settings-dropdown">
+            <div v-if="showSettingsMenu" id="header-settings" class="settings-dropdown">
               <!-- Account section (user info + admin) -->
               <div v-if="isAuthenticated" class="settings-user-header">
                 <UserAvatar
@@ -240,6 +243,7 @@ const navbarGradientStyle = computed(() => {
 const { isAuthenticated, user, logout, checkAuthStatus } = useAuth()
 const showSettingsMenu = ref(false)
 const settingsMenuRef = ref(null)
+const settingsButtonRef = ref(null)
 const router = useRouter()
 
 // Settings menu
@@ -602,8 +606,7 @@ onUnmounted(() => {
 
 /* ─── Label: SLEEPING — dimmed, slow breathe ─── */
 .nav-project-label.label-sleeping {
-  opacity: 0.35;
-  filter: grayscale(0.4);
+  color: var(--text-secondary);
   animation: labelBreathe 4s ease-in-out infinite;
 }
 
@@ -643,8 +646,8 @@ onUnmounted(() => {
 }
 
 @keyframes labelBreathe {
-  0%, 100% { transform: scale(1); opacity: 0.35; }
-  50% { transform: scale(0.97); opacity: 0.25; }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.97); }
 }
 
 @keyframes labelColorCycle {
@@ -689,7 +692,8 @@ onUnmounted(() => {
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 
@@ -702,6 +706,7 @@ onUnmounted(() => {
 /* Settings Menu */
 .settings-menu {
   position: relative;
+  flex-shrink: 0;
 }
 
 .settings-button {
@@ -712,8 +717,8 @@ onUnmounted(() => {
   height: 36px;
   border: 1px solid var(--border-color);
   background: transparent;
-  color: var(--text-muted);
-  border-radius: 50%;
+  color: var(--text-secondary);
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.25s ease;
 }
@@ -737,8 +742,9 @@ onUnmounted(() => {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  min-width: 260px;
+  box-shadow: 0 8px 24px var(--shadow-color);
+  width: 280px;
+  max-width: calc(100vw - 24px);
   z-index: 1000;
   animation: slideDown 0.2s ease;
   padding: 4px 0;
@@ -763,10 +769,18 @@ onUnmounted(() => {
   border: none;
   color: var(--text-primary);
   font-size: 0.875rem;
+  font-family: inherit;
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
   text-decoration: none;
+}
+
+.settings-button:focus-visible,
+.settings-dropdown-item:focus-visible,
+.nav-logo-link:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
 }
 
 .settings-dropdown-item:hover {
@@ -834,8 +848,9 @@ onUnmounted(() => {
 
 .settings-admin-badge {
   display: inline-block;
-  background: var(--accent-purple);
-  color: white;
+  background: var(--badge-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--overlay-border);
   padding: 1px 6px;
   border-radius: 3px;
   font-size: 0.625rem;
@@ -873,7 +888,7 @@ onUnmounted(() => {
 }
 
 .version-badge {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   padding: 3px 8px;
   border-radius: 4px;
   font-size: 0.6875rem;
@@ -921,13 +936,13 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .navbar {
     padding: 0.25rem 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .navbar-container {
     padding: 0 8px;
     gap: 4px;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .nav-left {
@@ -938,7 +953,7 @@ onUnmounted(() => {
   .nav-right {
     gap: 0.25rem;
     flex-shrink: 1;
-    overflow: hidden;
+    overflow: visible;
   }
 
 
@@ -956,6 +971,13 @@ onUnmounted(() => {
 
   .nav-project-selector {
     display: none;
+  }
+
+  /* Keep the settings panel within the viewport on small screens. */
+  .settings-dropdown {
+    max-height: calc(100dvh - 64px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   /* Sidebar becomes a slide-over overlay on mobile */

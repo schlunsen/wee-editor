@@ -1,12 +1,14 @@
 /* Neon Dark Theme - Cyberpunk vibes */
 [data-theme="neon-dark"] {
+  color-scheme: dark;
   --bg-primary: #0d0221;
   --bg-secondary: #1a0938;
   --bg-tertiary: #240f4f;
   --text-primary: #e0e0ff;
   --text-secondary: #b8b8ff;
-  --text-muted: #7a7aaa;
+  --text-muted: #9292b9;
   --accent-purple: #d946ef;
+  --accent-purple-rgb: 217, 70, 239;
   --accent-cyan: #00ffff;
   --accent-green: #39ff14;
   --accent-yellow: #ffff00;
@@ -47,24 +49,26 @@
 
 /* Neon Light Theme - Bright neon accents */
 [data-theme="neon-light"] {
+  color-scheme: light;
   --bg-primary: #f8f8ff;
   --bg-secondary: #e8e8ff;
   --bg-tertiary: #ffffff;
   --text-primary: #1a0938;
   --text-secondary: #4a148c;
-  --text-muted: #7a7aaa;
-  --accent-purple: #b026ff;
-  --accent-cyan: #00cccc;
-  --accent-green: #00cc00;
-  --accent-yellow: #cccc00;
-  --accent-orange: #ff5500;
+  --text-muted: #66668f;
+  --accent-purple: #9e22e6;
+  --accent-purple-rgb: 158, 34, 230;
+  --accent-cyan: #007676;
+  --accent-green: #007a00;
+  --accent-yellow: #6c6c00;
+  --accent-orange: #ba3e00;
   --border-color: #d0d0ff;
   --code-bg: #e8e8ff;
   --card-bg: #ffffff;
   --card-hover: #f0f0ff;
-  --status-success: #00cc00;
-  --status-warning: #cccc00;
-  --status-error: #ff0044;
+  --status-success: #007a00;
+  --status-warning: #6c6c00;
+  --status-error: #d40038;
 
   /* Context Progress Bar Colors */
   --progress-start: #00cccc;      /* Cyan - 0-25% */

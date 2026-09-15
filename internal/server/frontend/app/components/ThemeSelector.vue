@@ -1,6 +1,6 @@
 <template>
-  <div class="theme-selector" ref="selectorRef">
-    <button @click="toggleDropdown" class="theme-selector-button" :title="'Theme: ' + currentThemeData.name">
+  <div class="theme-selector" ref="selectorRef" @keydown.esc.stop.prevent="closeDropdown(); triggerRef?.focus()">
+    <button ref="triggerRef" :aria-expanded="isOpen" @click="toggleDropdown" class="theme-selector-button" :title="'Theme: ' + currentThemeData.name">
       <div class="theme-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/>
@@ -13,8 +13,9 @@
       </svg>
     </button>
 
+    <Teleport to="body">
     <Transition name="dropdown">
-      <div v-if="isOpen" class="theme-dropdown">
+      <div v-if="isOpen" ref="dropdownRef" class="theme-dropdown" :style="dropdownStyle" @click.stop @keydown.esc.stop.prevent="closeDropdown(); triggerRef?.focus()">
         <div class="dropdown-header">
           <span>Select Theme</span>
         </div>
@@ -24,6 +25,7 @@
             :key="theme.id"
             @click="selectTheme(theme.id)"
             class="theme-option"
+            :aria-pressed="currentTheme === theme.id"
             :class="{ 'theme-option-active': currentTheme === theme.id }"
           >
             <div class="theme-option-content">
@@ -49,6 +51,7 @@
         </div>
       </div>
     </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -65,8 +68,30 @@ withDefaults(defineProps<Props>(), {
 
 const { currentTheme, currentThemeData, availableThemes, setTheme } = useTheme()
 
+const triggerRef = ref<HTMLButtonElement | null>(null)
 const isOpen = ref(false)
 const selectorRef = ref<HTMLElement | null>(null)
+const dropdownRef = ref<HTMLElement | null>(null)
+const dropdownStyle = ref<Record<string, string>>({})
+
+function positionDropdown() {
+  if (!triggerRef.value || !dropdownRef.value) return
+  const trigger = triggerRef.value.getBoundingClientRect()
+  const width = Math.min(320, window.innerWidth - 24)
+  const height = Math.min(dropdownRef.value.offsetHeight, window.innerHeight - 24)
+  dropdownStyle.value = {
+    width: `${width}px`,
+    left: `${Math.max(12, Math.min(trigger.right - width, window.innerWidth - width - 12))}px`,
+    top: `${Math.max(12, Math.min(trigger.bottom + 8, window.innerHeight - height - 12))}px`
+  }
+}
+
+watch(isOpen, async (open) => {
+  if (!open) return
+  await nextTick()
+  positionDropdown()
+  dropdownRef.value?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true })
+})
 
 function toggleDropdown() {
   isOpen.value = !isOpen.value
@@ -79,20 +104,23 @@ function closeDropdown() {
 function selectTheme(themeId: ThemeVariant) {
   setTheme(themeId)
   closeDropdown()
+  triggerRef.value?.focus()
 }
 
 // Close dropdown when clicking outside
 onMounted(() => {
   const handleClickOutside = (event: MouseEvent) => {
-    if (selectorRef.value && !selectorRef.value.contains(event.target as Node)) {
+    if (selectorRef.value && !selectorRef.value.contains(event.target as Node) && !dropdownRef.value?.contains(event.target as Node)) {
       closeDropdown()
     }
   }
 
   document.addEventListener('click', handleClickOutside)
+  window.addEventListener('resize', positionDropdown)
 
   onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside)
+    window.removeEventListener('resize', positionDropdown)
   })
 })
 </script>
@@ -148,19 +176,21 @@ onMounted(() => {
 
 /* Dropdown */
 .theme-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 320px;
+  position: fixed;
+  width: min(320px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  display: flex;
+  flex-direction: column;
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
+  box-shadow: 0 8px 24px var(--shadow-color);
+  z-index: 3000;
   overflow: hidden;
 }
 
 .dropdown-header {
+  flex-shrink: 0;
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
   font-weight: 600;
@@ -170,6 +200,7 @@ onMounted(() => {
 
 .dropdown-content {
   max-height: 400px;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
 }
@@ -246,6 +277,7 @@ onMounted(() => {
 }
 
 .dropdown-footer {
+  flex-shrink: 0;
   padding: 12px 16px;
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -295,11 +327,4 @@ onMounted(() => {
   background: var(--text-muted);
 }
 
-/* Responsive */
-@media (max-width: 640px) {
-  .theme-dropdown {
-    right: -8px;
-    min-width: 280px;
-  }
-}
 </style>

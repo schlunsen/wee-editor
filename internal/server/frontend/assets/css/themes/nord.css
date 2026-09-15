@@ -1,23 +1,25 @@
 /* Nord Dark Theme - Arctic-inspired palette */
 [data-theme="nord-dark"] {
+  color-scheme: dark;
   --bg-primary: #2e3440;
   --bg-secondary: #3b4252;
   --bg-tertiary: #434c5e;
   --text-primary: #eceff4;
   --text-secondary: #d8dee9;
-  --text-muted: #4c566a;
-  --accent-purple: #b48ead;
-  --accent-cyan: #88c0d0;
-  --accent-green: #a3be8c;
+  --text-muted: #c8cbd1;
+  --accent-purple: #d9c5d5;
+  --accent-purple-rgb: 217, 197, 213;
+  --accent-cyan: #a8d1dd;
+  --accent-green: #bed1ad;
   --accent-yellow: #ebcb8b;
-  --accent-orange: #d08770;
+  --accent-orange: #e8c3b8;
   --border-color: #4c566a;
   --code-bg: #3b4252;
   --card-bg: #434c5e;
   --card-hover: #4c566a;
-  --status-success: #a3be8c;
+  --status-success: #bed1ad;
   --status-warning: #ebcb8b;
-  --status-error: #bf616a;
+  --status-error: #e7c3c6;
 
   /* Context Progress Bar Colors */
   --progress-start: #88c0d0;      /* Cyan - 0-25% */
@@ -47,24 +49,26 @@
 
 /* Nord Light Theme - Bright Nordic palette */
 [data-theme="nord-light"] {
+  color-scheme: light;
   --bg-primary: #eceff4;
   --bg-secondary: #e5e9f0;
   --bg-tertiary: #ffffff;
   --text-primary: #2e3440;
   --text-secondary: #3b4252;
   --text-muted: #4c566a;
-  --accent-purple: #b48ead;
-  --accent-cyan: #5e81ac;
-  --accent-green: #8fbcbb;
-  --accent-yellow: #ebcb8b;
-  --accent-orange: #d08770;
+  --accent-purple: #7a6176;
+  --accent-purple-rgb: 122, 97, 118;
+  --accent-cyan: #4e6b8f;
+  --accent-green: #536d6c;
+  --accent-yellow: #766646;
+  --accent-orange: #8d5c4c;
   --border-color: #d8dee9;
   --code-bg: #e5e9f0;
   --card-bg: #ffffff;
   --card-hover: #f9fafb;
-  --status-success: #a3be8c;
-  --status-warning: #ebcb8b;
-  --status-error: #bf616a;
+  --status-success: #5d6c50;
+  --status-warning: #766646;
+  --status-error: #a05159;
 
   /* Context Progress Bar Colors */
   --progress-start: #5e81ac;      /* Cyan - 0-25% */

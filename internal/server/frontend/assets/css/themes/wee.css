@@ -1,14 +1,15 @@
 /* Wee Dark Theme - Warm paper-inspired theme matching wee.cat */
 [data-theme="wee-dark"] {
+  color-scheme: dark;
   --bg-primary: #171614;         /* Deep warm dark - matches wee.cat dark */
   --bg-secondary: #1e1d1b;      /* Surface dark */
   --bg-tertiary: #252320;        /* Slightly lighter surface */
   --text-primary: #e8e4dd;       /* Warm off-white text */
   --text-secondary: #b0a99f;     /* Muted warm gray */
-  --text-muted: #8a847a;         /* Subtle warm gray */
+  --text-muted: #8f897f;
   --accent-purple: #d4735e;      /* Terracotta primary - matches wee.cat --color-primary */
+  --accent-purple-rgb: 212, 115, 94;
   --accent-purple-hover: #e0886e;
-  --accent-purple-rgb: 212, 115, 94; /* RGB for rgba() usage */
   --accent-cyan: #5ab87a;        /* Green accent - matches wee.cat --color-accent */
   --accent-green: #5ab87a;       /* Green for success states */
   --accent-yellow: #d4a55e;      /* Warm amber warning */
@@ -55,26 +56,27 @@
 
 /* Wee Light Theme - Warm paper theme matching wee.cat */
 [data-theme="wee-light"] {
+  color-scheme: light;
   --bg-primary: #f6f4f0;         /* Warm paper background - exact wee.cat --color-bg */
   --bg-secondary: #faf9f7;       /* App background - exact wee.cat --color-app-bg */
   --bg-tertiary: #ffffff;        /* White surface - exact wee.cat --color-surface */
   --text-primary: #1a1a1a;       /* Near-black text - exact wee.cat --color-text */
-  --text-secondary: #7a756d;     /* Muted text - exact wee.cat --color-text-muted */
-  --text-muted: #9a958d;         /* Lighter muted for subtle elements */
-  --accent-purple: #c4533a;      /* Terracotta primary - exact wee.cat --color-primary */
+  --text-secondary: #6f6a63;
+  --text-muted: #6f6b66;
+  --accent-purple: #b24c35;
+  --accent-purple-rgb: 178, 76, 53;
   --accent-purple-hover: #a8432e; /* Hover state - exact wee.cat --color-primary-hover */
-  --accent-purple-rgb: 196, 83, 58; /* RGB for rgba() usage */
-  --accent-cyan: #2a7d4f;        /* Green accent - exact wee.cat --color-accent */
-  --accent-green: #2a7d4f;       /* Green for success */
-  --accent-yellow: #b8862e;      /* Warm amber warning */
-  --accent-orange: #c4533a;      /* Terracotta for attention */
+  --accent-cyan: #297a4d;
+  --accent-green: #297a4d;
+  --accent-yellow: #8a6522;
+  --accent-orange: #b24c35;
   --border-color: #e0dcd5;       /* Border - exact wee.cat --color-border */
   --code-bg: #f0ede8;            /* Subtle warm code background */
   --card-bg: #ffffff;            /* White cards - wee.cat --color-surface */
   --card-hover: #faf9f7;         /* Subtle warm hover */
-  --status-success: #2a7d4f;     /* Green success */
-  --status-warning: #b8862e;     /* Amber warning */
-  --status-error: #c4533a;       /* Terracotta error */
+  --status-success: #297a4d;
+  --status-warning: #8a6522;
+  --status-error: #b24c35;
 
   /* Context Progress Bar Colors */
   --progress-start: #2a7d4f;      /* Green - 0-25% */

@@ -243,12 +243,12 @@
       </NuxtLink>
 
       <!-- Refresh button -->
-      <button class="refresh-btn" @click="$emit('refresh')" :disabled="loading">
+      <button v-if="!hideRefresh" class="refresh-btn" aria-label="Refresh Git status" title="Refresh Git status" @click="$emit('refresh')" :disabled="loading">
         <svg class="refresh-icon" :class="{ spinning: loading }" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M1 4v6h6M23 20v-6h-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>Refresh</span>
+        <span class="refresh-label">Refresh</span>
       </button>
     </div>
   </div>
@@ -290,6 +290,7 @@ interface Props {
   maxDisplayFiles?: number
   sessionId?: string
   worktreePath?: string
+  hideRefresh?: boolean
   githubUrl?: string
 }
 
@@ -848,4 +849,12 @@ a.branch-file-name:hover {
   color: var(--accent-cyan, #3b82f6);
   text-decoration: underline;
 }
+
+/* Status is a quiet summary, with actions grouped beneath it. */
+.clean-message { background: transparent; border: 0; padding: 0; color: var(--text-primary); font-size: 0.8125rem; }
+.check-icon { color: var(--status-success); }
+.branch-info { padding: 0; font-size: 0.75rem; }
+.sync-status { font-size: 0.75rem; }
+.refresh-btn { width: 30px; min-width: 30px; padding: 5px; background: transparent; border: 0; color: var(--text-secondary); }
+.refresh-label { display: none; }
 </style>

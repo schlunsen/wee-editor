@@ -36,9 +36,10 @@ export const useUIStore = defineStore('ui', {
       isGeneratingSummary: false,
       selectedMessageId: null,
       expandedToolIds: new Set(),
-      sectionOrder: ['gitStatus', 'sessionInfo', 'toolsPermissions'],  // Default order: git first
+      sectionOrder: ['sessionInfo', 'gitStatus', 'toolsPermissions', 'activity'],
       expandedSections: {
-        sessionInfo: false,
+        sessionInfo: true,
+        activity: false,
         toolsPermissions: false,
         gitStatus: true
       }
@@ -61,7 +62,7 @@ export const useUIStore = defineStore('ui', {
             }
             // Hydrate expanded sections
             if (parsed.data.expandedSections && typeof parsed.data.expandedSections === 'object') {
-              defaultState.expandedSections = parsed.data.expandedSections
+              defaultState.expandedSections = { ...defaultState.expandedSections, ...parsed.data.expandedSections }
             }
           }
         }

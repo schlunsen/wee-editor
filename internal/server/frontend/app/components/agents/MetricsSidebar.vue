@@ -47,9 +47,7 @@
                 <span class="status-dot-sm"></span>
                 {{ session.status }}
               </span>
-              <span class="context-pct" :class="{ 'has-data': contextUsage?.percentage != null }">
-                {{ contextUsage?.percentage != null ? Math.round(contextUsage.percentage) + '%' : '0%' }}
-              </span>
+
             </div>
 
             <!-- Tag row -->
@@ -112,12 +110,8 @@
           <span class="info-value accent">{{ messageCount }}</span>
         </div>
         <div class="info-cell">
-          <span class="info-label">Provider</span>
-          <span class="info-value">{{ getProviderDisplay(currentProviderId) }}</span>
-        </div>
-        <div class="info-cell">
           <span class="info-label info-label-row">
-            <span>Model</span>
+            <span>{{ getProviderDisplay(currentProviderId) }} · Model</span>
             <button
               class="model-switch-btn"
               :disabled="!canSwitchModel && !showModelSwitcher"
@@ -161,13 +155,6 @@
         </template>
       </div>
 
-      <!-- Subagent Tracker Section -->
-      <SubagentTrackerSection
-        v-if="session"
-        :session-id="session.id"
-        @view-agent="(agentId: string) => $emit('view-agent', agentId)"
-      />
-
       <!-- Project Area Section -->
       <div v-if="session?.project_area" class="area-section">
         <span class="area-label">PROJECT AREA</span>
@@ -176,17 +163,6 @@
           <span class="area-name">{{ session.project_area.name }}</span>
         </div>
         <div class="area-path">{{ session.project_area.relative_path }}</div>
-      </div>
-
-      <!-- Memory Palace Link -->
-      <div v-if="session?.project_id" class="memory-palace-section">
-        <NuxtLink :to="`/projects/${session.project_id}/memories`" class="memory-palace-link">
-          <span class="memory-palace-icon">🧠</span>
-          <span class="memory-palace-text">Memory Palace</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="memory-palace-arrow">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </NuxtLink>
       </div>
 
       <SessionMetrics
@@ -199,7 +175,28 @@
         :context-loading="contextLoading"
         @refresh-context="$emit('refresh-context')"
         @refresh-permissions="$emit('refresh-permissions')"
+      >
+        <template #subagents>      <!-- Subagent Tracker Section -->
+      <SubagentTrackerSection
+        v-if="session"
+        :session-id="session.id"
+        @view-agent="(agentId: string) => $emit('view-agent', agentId)"
       />
+
+</template>
+      </SessionMetrics>
+      <!-- Memory Palace Link -->
+      <div v-if="session?.project_id" class="memory-palace-section">
+        <NuxtLink :to="`/projects/${session.project_id}/memories`" class="memory-palace-link">
+          <span class="memory-palace-icon">🧠</span>
+          <span class="memory-palace-text">Memory Palace</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="memory-palace-arrow">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </NuxtLink>
+      </div>
+
+
     </div>
   </aside>
 </template>
@@ -1575,4 +1572,20 @@ watch(sessionStartTime, (newVal) => {
 .metrics-sidebar {
   animation: slideIn 0.3s ease-out;
 }
+
+/* Session summary stays compact; code-specific values retain monospace. */
+.metrics-sidebar { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; box-shadow: none; }
+.metrics-sidebar:hover { box-shadow: none; }
+.compact-header { background: transparent; padding: 16px; border-bottom: 0; }
+.avatar-wrapper-sm, .avatar-ring { width: 48px; height: 48px; }
+.avatar-container-sm { width: 42px; height: 42px; }
+.avatar-name { font-size: 0.875rem; text-shadow: none; }
+.info-grid { background: transparent; gap: 4px; padding: 0 16px 12px; }
+.info-cell { padding: 4px 0; background: transparent; }
+.info-label { text-transform: none; letter-spacing: 0; opacity: 1; font-size: 0.6875rem; }
+.info-cell:last-child { grid-column: 1 / -1; }
+.info-value, .info-value.accent, .info-value.mono { color: var(--text-primary); font-size: 0.75rem; }
+.memory-palace-section { padding: 8px 16px; }
+.memory-palace-link { padding: 4px 0; border: 0; background: transparent; font-size: 0.75rem; }
+.memory-palace-link:hover { background: transparent; box-shadow: none; }
 </style>

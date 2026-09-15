@@ -178,6 +178,13 @@ ls -lh dist/
 # - wee-windows-amd64.exe
 ```
 
+> **Note:** `sqlite` and `sherpa-onnx` both need cgo, and Go disables cgo
+> whenever `GOOS`/`GOARCH` differ from the host. From a Mac only `darwin/arm64`
+> builds; the other four need a cross toolchain or a native runner. `just
+> build-all` prints a size per target and the reason for each failure, and exits
+> non-zero unless every target built. CI builds the release binaries on native
+> runners — see `just release`.
+
 ## Test 6: Performance Testing
 
 ### Startup Speed Test

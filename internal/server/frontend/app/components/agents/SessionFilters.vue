@@ -5,9 +5,10 @@
       :key="filter.value"
       @click="$emit('update:activeFilter', filter.value)"
       class="filter-tab"
+      :aria-pressed="activeFilter === filter.value"
       :class="{ active: activeFilter === filter.value }"
     >
-      {{ filter.label }}
+      <span class="filter-label">{{ filter.value === 'all' ? 'All sessions' : filter.label }}</span>
       <span class="filter-count">{{ filter.count }}</span>
     </button>
   </div>
@@ -82,6 +83,11 @@ defineEmits<{
 
 .filter-tab.active .filter-count {
   background: var(--accent-purple);
-  color: white;
+  color: var(--bg-primary);
 }
+
+.session-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.filter-tab { min-width: 0; flex-direction: column; gap: 4px; padding: 6px 2px; font-size: 0.6875rem; font-family: inherit; }
+.filter-label { white-space: nowrap; }
+.filter-tab:focus-visible { outline: 2px solid var(--accent-purple); outline-offset: 2px; }
 </style>

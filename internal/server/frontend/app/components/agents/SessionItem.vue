@@ -520,12 +520,12 @@ const formatTokens = (tokens: number | undefined): string => {
 }
 
 .session-item.active {
-  background: color-mix(in srgb, var(--avatar-color) 15%, transparent);
+  background: var(--overlay-bg-active);
   border-left: 3px solid var(--avatar-color);
 }
 
 .session-item.focused {
-  background: color-mix(in srgb, var(--avatar-color) 25%, transparent);
+  background: var(--overlay-bg-hover);
   border-left: 3px solid color-mix(in srgb, var(--avatar-color) 60%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--avatar-color) 30%, transparent);
 }
@@ -1065,4 +1065,10 @@ const formatTokens = (tokens: number | undefined): string => {
     font-size: 0.8rem;
   }
 }
+
+.session-item { min-height: 76px; border-radius: 6px; }
+.session-item.active { border-left-color: var(--accent-purple); box-shadow: inset 0 0 0 1px var(--border-color); }
+.session-name { font-size: 0.8125rem; }
+.session-model { text-transform: none; color: var(--text-secondary); }
+.context-usage-bar { top: auto; bottom: 0; height: 2px; border: 0; }
 </style>

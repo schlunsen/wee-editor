@@ -13,13 +13,14 @@
       class="sections-container"
     >
       <template #item="{ element }">
+        <div class="section-shell">
         <!-- Session Info Section -->
         <div v-if="element.id === 'sessionInfo'" class="collapsible-section">
-          <button class="section-header" @click="toggleSection('sessionInfo')">
+          <button class="section-header" :aria-expanded="expandedSections.sessionInfo" @click="toggleSection('sessionInfo')">
             <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
             <span class="header-content">
               <Icon name="mdi:information-variant-circle" class="section-icon-svg" size="20" />
-              <span class="section-title">Session Info</span>
+              <span class="section-title">Context</span>
             </span>
             <svg class="toggle-arrow" :class="{ 'collapsed': !expandedSections.sessionInfo }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"></polyline>
@@ -29,6 +30,7 @@
             <!-- Context Usage Bar -->
             <ContextUsageBar
               :usage="contextUsage"
+              :message-count="messageCount ?? session.message_count"
               :loading="contextLoading"
               @refresh="$emit('refresh-context')"
             />
@@ -37,11 +39,11 @@
 
         <!-- Tools and Permissions Section -->
         <div v-else-if="element.id === 'toolsPermissions'" class="collapsible-section">
-          <button class="section-header" @click="toggleSection('toolsPermissions')">
+          <button class="section-header" :aria-expanded="expandedSections.toolsPermissions" @click="toggleSection('toolsPermissions')">
             <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
             <span class="header-content">
               <Icon name="mdi:shield-lock-outline" class="section-icon-svg" size="20" />
-              <span class="section-title">Tools & Permissions</span>
+              <span class="section-title">Controls</span>
             </span>
             <svg class="toggle-arrow" :class="{ 'collapsed': !expandedSections.toolsPermissions }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"></polyline>
@@ -53,7 +55,7 @@
               <div class="metric-content">
                 <div class="metric-label">
                   <Icon name="mdi:shield-lock" class="metric-label-icon" size="20" />
-                  <span>Project Permissions</span>
+                  <span>Project permissions</span>
                 </div>
                 <ProjectPermissions :permissions="projectPermissions" @refresh="$emit('refresh-permissions')" />
               </div>
@@ -71,6 +73,7 @@
                   <label class="yolo-toggle">
                     <input
                       type="checkbox"
+                      aria-label="YOLO Mode"
                       :checked="yoloModeEnabled"
                       @change="toggleYOLOMode"
                       :disabled="!session"
@@ -84,21 +87,13 @@
 
                 <p class="yolo-description">
                   <template v-if="yoloModeEnabled">
-                    <strong>All permissions bypassed.</strong> Tools execute without approval.
+                    <strong>Tools execute without approval.</strong>
                   </template>
                   <template v-else>
-                    Skip all permission checks. Only use in sandboxed environments.
+                    Ask for approval before restricted tool actions.
                   </template>
                 </p>
 
-                <div v-if="yoloModeEnabled" class="yolo-warning">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                  </svg>
-                  <span>Use only in isolated, sandboxed environments</span>
-                </div>
               </div>
             </div>
 
@@ -107,13 +102,14 @@
               <div class="metric-content">
                 <div class="metric-label yolo-header">
                   <Icon name="mdi:swap-horizontal" class="metric-label-icon" size="20" />
-                  <span>Auto-Handoff</span>
+                  <span>Auto-handoff</span>
                 </div>
 
                 <div class="yolo-toggle-container">
                   <label class="yolo-toggle">
                     <input
                       type="checkbox"
+                      aria-label="Auto-handoff"
                       :checked="autoHandoffEnabled"
                       @change="toggleAutoHandoff"
                       :disabled="!session"
@@ -151,6 +147,16 @@
               </div>
             </div>
 
+          </div>
+        </div>
+        <div v-else-if="element.id === 'activity'" class="collapsible-section">
+          <button class="section-header" :aria-expanded="expandedSections.activity" @click="toggleSection('activity')">
+            <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
+            <span class="header-content"><Icon name="mdi:history" size="20" /><span class="section-title">Activity</span></span>
+            <span aria-hidden="true">{{ expandedSections.activity ? '−' : '+' }}</span>
+          </button>
+          <div v-show="expandedSections.activity" class="section-content">
+            <slot name="subagents" />
             <!-- Summary Cards Grid -->
             <div class="metrics-grid">
               <!-- Tools Used Card -->
@@ -158,7 +164,7 @@
                 <div class="metric-content">
                   <div class="metric-label">
                     <Icon name="mdi:wrench-outline" class="metric-label-icon" size="20" />
-                    <span>Tools Used</span>
+                    <span>Recorded tool calls</span>
                   </div>
                   <div class="metric-value">{{ toolStats.count }}</div>
                   <div v-if="toolStats.count > 0" class="tools-list">
@@ -174,7 +180,7 @@
                     </span>
                   </div>
                   <div v-else class="empty-state">
-                    <span>No tools used yet</span>
+                    <span>No tool activity recorded. Historical calls may be unavailable.</span>
                   </div>
                 </div>
               </div>
@@ -184,7 +190,7 @@
                 <div class="metric-content">
                   <div class="metric-label">
                     <Icon name="mdi:shield-lock" class="metric-label-icon" size="20" />
-                    <span>Permissions</span>
+                    <span>Approval requests</span>
                   </div>
                   <div class="metric-values">
                     <span class="approved">✅ {{ permissionStats.approved }}</span>
@@ -192,7 +198,7 @@
                   </div>
                   <div class="permission-bar">
                     <div class="approved-bar" :style="{ width: approvalPercentage + '%' }" v-if="permissionStats.total > 0"></div>
-                    <div v-else class="empty-bar">No permissions yet</div>
+                    <div v-else class="empty-bar">No requests recorded</div>
                   </div>
                 </div>
               </div>
@@ -211,36 +217,13 @@
                     </div>
                     <div class="detail-row">
                       <span class="detail-label">Tools:</span>
-                      <span class="detail-value">{{ (session.options?.tools || []).length }}</span>
+                      <span class="detail-value">{{ session.options?.tools?.length ? session.options.tools.length + ' configured' : 'Provider defaults' }}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Tool Breakdown Card -->
-            <div class="metric-card tool-breakdown-metric">
-              <div class="metric-content">
-                <div class="metric-label">
-                  <Icon name="mdi:chart-box" class="metric-label-icon" size="20" />
-                  <span>Tool Breakdown</span>
-                </div>
-                <div v-if="toolStats.count > 0" class="tool-list">
-                  <div v-for="(count, tool) in toolStats.byName" :key="tool" class="tool-item">
-                    <div class="tool-header">
-                      <span class="tool-name">{{ getToolIcon(tool) }} {{ tool }}</span>
-                      <span class="tool-count">{{ count }} use{{ count !== 1 ? 's' : '' }}</span>
-                    </div>
-                    <div class="tool-bar">
-                      <div class="tool-fill" :style="{ width: getToolPercentage(count) + '%' }"></div>
-                    </div>
-                  </div>
-                </div>
-                <div v-else class="empty-state">
-                  <span>No tool usage data available</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -251,16 +234,19 @@
           :class="{ 'git-status-updated': gitStatusUpdated }"
           @animationend="gitStatusUpdated = false"
         >
-          <button class="section-header" @click="toggleSection('gitStatus')">
+          <div class="section-header-row">
+          <button class="section-header" :aria-expanded="expandedSections.gitStatus" @click="toggleSection('gitStatus')">
             <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
             <span class="header-content">
               <Icon name="mdi:github" class="section-icon-svg" size="20" />
-              <span class="section-title">Git Status</span>
+              <span class="section-title">Git</span>
             </span>
             <svg class="toggle-arrow" :class="{ 'collapsed': !expandedSections.gitStatus }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </button>
+            <button v-if="session?.git_branch" class="section-refresh" :disabled="gitLoading" aria-label="Refresh Git status" title="Refresh Git status" @click="fetchGitStatus"><Icon name="mdi:refresh" size="18" /></button>
+          </div>
           <div v-show="expandedSections.gitStatus" class="section-content">
             <!-- No git branch available -->
             <div v-if="!session?.git_branch" class="git-not-available">
@@ -276,6 +262,7 @@
             <GitStatus
               v-else-if="gitStatus"
               :status="gitStatus"
+              hide-refresh
               :loading="gitLoading"
               :session-id="session?.id"
               :worktree-path="session?.worktree_path || ''"
@@ -287,6 +274,7 @@
               <span>Loading git status...</span>
             </div>
           </div>
+        </div>
         </div>
       </template>
     </draggable>
@@ -395,7 +383,7 @@ const toggleSection = (sectionId: string) => {
 // Section ordering
 const orderedSections = computed({
   get() {
-    return uiStore.sectionOrder.map(id => ({ id }))
+    return [...new Set([...uiStore.sectionOrder, 'activity'])].filter(id => ['sessionInfo', 'gitStatus', 'toolsPermissions', 'activity'].includes(id)).map(id => ({ id }))
   },
   set(value) {
     const order = value.map(item => item.id)
@@ -425,7 +413,9 @@ const yoloModeEnabled = computed(() => {
 })
 
 // Method: Toggle YOLO Mode with confirmation
-const toggleYOLOMode = async () => {
+const toggleYOLOMode = async (event?: Event) => {
+  // Keep the control in sync with confirmed server state, including cancellation.
+  if (event?.target instanceof HTMLInputElement) event.target.checked = yoloModeEnabled.value
   if (!props.session) return
   if (!agentWs) {
     console.error('WebSocket not available - cannot toggle YOLO mode')
@@ -437,7 +427,7 @@ const toggleYOLOMode = async () => {
   // Show confirmation dialog when enabling
   if (newState) {
     const confirmed = window.confirm(
-      '⚠️ Enable YOLO Mode?\n\n' +
+      'Enable YOLO Mode?\n\n' +
       'This will restart the session with ALL permissions bypassed.\n' +
       'The conversation history will be preserved.\n\n' +
       'Only use in sandboxed environments with no internet access.\n\n' +
@@ -565,11 +555,11 @@ watch(
   () => props.toolExecutions,
   (newVal) => {
     if (newVal && typeof newVal === 'object') {
-      // Count unique tools (number of keys in the object)
-      const uniqueToolCount = Object.keys(newVal).length
+      // Count executions, rather than distinct tool names.
+      const executionCount = Object.values(newVal).reduce((total, count) => total + count, 0)
 
       toolStats.value = {
-        count: uniqueToolCount,
+        count: executionCount,
         byName: newVal
       }
     } else {
@@ -1224,12 +1214,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--status-error) !important;
+  color: var(--text-primary);
 }
 
 .yolo-header .warning-icon {
   flex-shrink: 0;
-  animation: pulse 2s infinite;
+  color: var(--status-warning);
 }
 
 @keyframes pulse {
@@ -1510,4 +1500,40 @@ onBeforeUnmount(() => {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* Flat session inspector: shared surfaces, compact rows, restrained accents. */
+.section-header { padding: 12px 16px; }
+.section-title, .metric-label { text-transform: none; letter-spacing: 0; font-size: 0.8125rem; }
+.section-icon-svg, .metric-label-icon { color: var(--text-secondary); }
+.section-content { padding: 0 16px 16px; }
+.metrics-grid { display: flex; flex-direction: column; gap: 16px; }
+.metric-card, .metric-card:hover { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; transform: none; }
+.metric-card + .metric-card { margin-top: 16px; }
+.metric-value { font-size: 1.15rem; color: var(--text-primary); }
+.metric-label { margin-bottom: 8px; color: var(--text-secondary); }
+.empty-state { padding: 4px 0; background: transparent; font-style: normal; color: var(--text-secondary); }
+.permission-bar { min-height: 20px; height: auto; background: transparent; }
+.empty-bar { position: static; color: var(--text-secondary); font-size: 0.75rem; }
+.yolo-mode-metric.enabled { padding: 12px; background: var(--overlay-bg); border: 1px solid var(--border-color); box-shadow: none; }
+.yolo-header, .yolo-mode-metric.enabled .yolo-header, .warning-icon { color: var(--text-primary); }
+.yolo-description { font-size: 0.75rem; line-height: 1.5; margin: 8px 0 0; }
+.yolo-description strong { color: var(--text-primary); font-weight: 500; }
+.toggle-label.active { color: var(--text-primary); }
+.section-header:focus-visible, input:focus-visible { outline: 2px solid var(--accent-purple); outline-offset: -2px; }
+
+.yolo-toggle input:focus-visible + .toggle-slider { outline: 2px solid var(--accent-purple); outline-offset: 3px; }
+.yolo-toggle input:checked + .toggle-slider { background: var(--accent-purple); }
+.auto-handoff-metric.enabled { background: transparent; border: 0; box-shadow: none; }
+:deep(.project-permissions .permissions-box) { background: transparent; border: 0; }
+:deep(.project-permissions .summary-content) { padding: 0; }
+:deep(.project-permissions .no-permissions-state) { padding: 4px 0; font-size: 0.75rem; }
+:deep(.project-permissions .manage-button) { background: transparent; color: var(--accent-purple); }
+
+.section-header-row { display: flex; align-items: center; }
+.section-header-row .section-header { flex: 1; min-width: 0; }
+.section-refresh { display: flex; margin-right: 12px; padding: 5px; background: transparent; color: var(--text-secondary); border: 0; border-radius: 4px; cursor: pointer; }
+.section-refresh:hover { background: var(--overlay-bg-hover); }
+.section-refresh:focus-visible { outline: 2px solid var(--accent-purple); }
+.section-refresh:disabled { opacity: 0.5; cursor: wait; }
+.section-content { border-top: 0; }
 </style>

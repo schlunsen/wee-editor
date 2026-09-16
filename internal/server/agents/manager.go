@@ -111,8 +111,8 @@ type AgentSession struct {
 	missedMessageCount   int32              // Atomic counter for messages that used fallback broadcast (channel timeout)
 	directMCPClient      *mcpclient.Client  // Cached MCP client for direct provider sessions
 	directMCPMu          sync.Mutex         // Protects directMCPClient
-	codexTurnDone        chan struct{}      // Closed when the in-flight Codex turn exits; nil when none is running
-	codexTurnMu          sync.Mutex         // Protects codexTurnDone
+	codexRun             *codexRun          // Active app-server run; protected by codexTurnMu
+	codexTurnMu          sync.Mutex         // Protects codexRun
 	respMu               sync.RWMutex       // Guards responseChan: producers RLock while sending, swapResponseChan Locks to swap+close
 
 	// Session reader: one per client, for the client's whole life (see ensureSessionReader).

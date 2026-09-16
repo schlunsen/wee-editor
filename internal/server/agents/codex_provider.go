@@ -1,9 +1,11 @@
 // Package agents - codex_provider.go implements the OpenAI Codex execution path.
 //
 // When a session selects the "codex" provider (or a model whose name contains
-// "codex"), prompts are executed by the Codex CLI through codex-sdk-go instead
+// "codex"), prompts are executed by the Codex CLI app-server instead
 // of the Claude CLI or the direct OpenAI-compatible loop. Codex brings its own
-// agent loop, sandbox and tools; this file maps its JSONL event stream onto the
+// agent loop, sandbox and tools; codex-sdk-go locates the CLI and supplies event
+// types. The bidirectional app-server connection supports follow-up steering.
+// This file maps the event stream onto the
 // SDK-compatible messages the existing WebSocket/DB pipeline already understands
 // (AssistantMessage, UserMessage/tool_result, ResultMessage).
 //
@@ -14,23 +16,19 @@
 package agents
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/schlunsen/claude-agent-sdk-go/types"
+	codextypes "github.com/schlunsen/codex-sdk-go/types"
 	"github.com/schlunsen/wee-editor/internal/llmclient"
 	"github.com/schlunsen/wee-editor/internal/logging"
-	codex "github.com/schlunsen/codex-sdk-go"
-	codextypes "github.com/schlunsen/codex-sdk-go/types"
 )
 
 // CodexProviderID is the provider ID used in the providers table and session options.
@@ -232,150 +230,70 @@ func (sm *SessionManager) sendPromptCodexInputs(session *AgentSession, sessionID
 	if cleanup == nil {
 		cleanup = func() {}
 	}
-	logging.Info("🟢 Codex provider path: session=%s, model=%s", sessionID, session.ModelName)
-
-	apiKey, baseURL := sm.resolveCodexConfig(session)
-	copts := codextypes.NewCodexOptions().WithAPIKey(apiKey).WithBaseURL(baseURL)
-	if cfg := codexMCPConfig(findWeeBinaryPath()); cfg != nil {
-		copts.WithConfig(cfg)
-	}
-	if apiKey == "" {
-		logging.Info("Codex provider: no API key configured, relying on `codex login` credentials")
-	}
-
-	client, err := codex.New(copts)
-	if err != nil {
-		cleanup()
-		if codextypes.IsCLINotFoundError(err) {
-			return fmt.Errorf("codex provider: Codex CLI not found — install it with `npm install -g @openai/codex`, then run `codex login` or configure an API key in Settings > Providers")
+	session.codexTurnMu.Lock()
+	if run := session.codexRun; run != nil && run.accepting && run.ctx.Err() == nil {
+		run.pending = append(run.pending, codexSubmission{inputs, cleanup})
+		select {
+		case run.wake <- struct{}{}:
+		default:
 		}
-		return fmt.Errorf("codex provider: %w", err)
+		session.codexTurnMu.Unlock()
+		return nil
 	}
-
-	topts := codextypes.NewThreadOptions().
-		WithSkipGitRepoCheck(true).
-		WithApprovalPolicy(codextypes.ApprovalNever).
-		WithSandboxMode(codexSandboxMode(&session.Options))
-	if session.ModelName != "" {
-		topts.WithModel(session.ModelName)
+	run := &codexRun{ctx: session.ctx, accepting: true, wake: make(chan struct{}, 1), done: make(chan struct{})}
+	var prev <-chan struct{}
+	if session.codexRun != nil {
+		prev = session.codexRun.done
 	}
-	if wd := codexWorkingDir(session); wd != "" {
-		topts.WithWorkingDirectory(wd)
-	}
-	if effort := codexReasoningEffort(session.Options.EffortLevel); effort != "" {
-		topts.WithModelReasoningEffort(effort)
-	}
-
-	// Resolved inside the goroutine: a queued prompt must see the thread id
-	// the in-flight turn may have just created.
-	resolveThread := func() *codex.Thread {
-		sm.mu.Lock()
-		threadID := codexStr(session.Options.CodexThreadID)
-		sm.mu.Unlock()
-		if threadID != "" {
-			logging.Info("Codex provider: resuming thread %s", threadID)
-			return client.ResumeThread(threadID, topts)
-		}
-		thread := client.StartThread(topts)
-		// A brand-new thread after a model switch is seeded with the stored
-		// transcript so the conversation continues where it left off.
-		if sm.historyReplayPending(session) {
-			if prefix := sm.historyReplayPrefix(session, promptSequence); prefix != "" {
-				inputs = append([]codextypes.UserInput{codextypes.TextInput(prefix)}, inputs...)
-			}
-		}
-		if preamble := codexPreamble(session); preamble != "" {
-			inputs = append([]codextypes.UserInput{codextypes.TextInput(preamble)}, inputs...)
-		}
-		return thread
-	}
-
-	// Codex allows a single writer per thread: a new prompt must wait for the
-	// in-flight turn (if any) to exit before it can resume the same thread.
-	// Register this turn now so a third prompt queues behind it in order.
-	prevDone, myDone := sm.beginCodexTurn(session)
-
+	session.codexRun = run
+	session.codexTurnMu.Unlock()
 	go func() {
 		var turnErr error
-		defer cleanup()
-		defer sm.endCodexTurn(session, myDone)
 		defer func() {
 			if r := recover(); r != nil {
-				logging.Error("Codex provider: PANIC: %v", r)
+				turnErr = fmt.Errorf("codex provider panic: %v", r)
 			}
-
-			sm.mu.Lock()
-			if turnErr != nil {
-				errMsg := turnErr.Error()
-				session.ErrorMessage = &errMsg
-				session.Status = SessionStatusError
-			} else {
-				session.Status = SessionStatusIdle
+			cleanup()
+			session.codexTurnMu.Lock()
+			run.accepting = false
+			for _, p := range run.pending {
+				p.cleanup()
 			}
-			session.UpdatedAt = time.Now()
-			sm.updateSessionInDB(&session.Session)
-			sm.mu.Unlock()
-
-			sm.broadcastSessionUpdate(session)
-
-			if atomic.LoadInt32(&session.missedMessageCount) > 0 {
-				missed := atomic.SwapInt32(&session.missedMessageCount, 0)
-				logging.Info("Codex provider: %d messages missed during session %s, scheduling recovery", missed, sessionID)
-				go func() {
-					time.Sleep(5 * time.Second)
-					if err := sm.resendAllMessagesFromDB(session.ID); err != nil {
-						logging.Debug("Codex provider: delayed recovery failed for session %s: %v", sessionID, err)
+			run.pending = nil
+			current := session.codexRun == run
+			if current {
+				sm.mu.Lock()
+				if run.ctx.Err() == nil {
+					session.Status = SessionStatusIdle
+					if turnErr != nil {
+						message := turnErr.Error()
+						session.ErrorMessage = &message
+						session.Status = SessionStatusError
 					}
-					sm.broadcastSessionUpdate(session)
-				}()
+					session.UpdatedAt = time.Now()
+					sm.updateSessionInDB(&session.Session)
+				}
+				sm.mu.Unlock()
 			}
-
-			logging.Info("Codex provider: session %s turn completed (err=%v)", sessionID, turnErr)
+			session.codexTurnMu.Unlock()
+			if turnErr != nil && run.ctx.Err() == nil {
+				sm.sendDirectError(session, turnErr)
+			}
+			if current {
+				sm.broadcastSessionUpdate(session)
+			}
+			close(run.done)
 		}()
-
-		if prevDone != nil {
-			logging.Info("Codex provider: session %s has a turn in flight, queueing prompt until it finishes", sessionID)
-			select {
-			case <-prevDone:
-			case <-session.ctx.Done():
-				logging.Info("Codex provider: queued prompt for session %s dropped (session interrupted)", sessionID)
-				return
-			}
+		if prev != nil {
+			// Keep the writer chain intact even if this queued run was cancelled.
+			<-prev
 		}
-
-		turnErr = sm.runCodexTurn(session, resolveThread(), inputs)
-		if turnErr != nil {
-			logging.Error("Codex provider: turn failed for session %s: %v", sessionID, turnErr)
-			sm.sendDirectError(session, turnErr)
+		if run.ctx.Err() != nil {
+			return
 		}
+		turnErr = sm.runCodexApp(session, run, inputs, promptSequence)
 	}()
-
 	return nil
-}
-
-// beginCodexTurn registers a new in-flight turn for the session. It returns
-// the done channel of the previously registered turn (nil if none) — which the
-// caller must wait on before touching the thread — and the channel for this
-// turn, to be passed to endCodexTurn when it exits.
-func (sm *SessionManager) beginCodexTurn(session *AgentSession) (prev <-chan struct{}, mine chan struct{}) {
-	mine = make(chan struct{})
-	session.codexTurnMu.Lock()
-	defer session.codexTurnMu.Unlock()
-	if session.codexTurnDone != nil {
-		prev = session.codexTurnDone
-	}
-	session.codexTurnDone = mine
-	return prev, mine
-}
-
-// endCodexTurn marks a turn as finished, releasing anything queued behind it.
-func (sm *SessionManager) endCodexTurn(session *AgentSession, mine chan struct{}) {
-	session.codexTurnMu.Lock()
-	if session.codexTurnDone == mine {
-		session.codexTurnDone = nil
-	}
-	session.codexTurnMu.Unlock()
-	close(mine)
 }
 
 func codexWorkingDir(session *AgentSession) string {
@@ -383,57 +301,6 @@ func codexWorkingDir(session *AgentSession) string {
 		return session.WorktreePath
 	}
 	return codexStr(session.Options.WorkingDirectory)
-}
-
-// runCodexTurn streams one Codex turn and forwards its events to the session.
-func (sm *SessionManager) runCodexTurn(session *AgentSession, thread *codex.Thread, inputs []codextypes.UserInput) error {
-	start := time.Now()
-	stream, err := thread.RunStreamedInputs(session.ctx, inputs, nil)
-	if err != nil {
-		return err
-	}
-	// Codex allows a single writer per thread. If this turn unwinds without
-	// draining the stream (a panic, or an early return added later), the codex
-	// subprocess stays alive holding the thread-store writer lock and every
-	// following prompt fails with "thread ... already has an active writer".
-	// Close is a no-op once the turn has ended normally.
-	defer func() { _ = stream.Close() }()
-
-	state := newCodexTurnState()
-	var usage *codextypes.Usage
-	var turnErr error
-
-	for ev := range stream.Events() {
-		switch e := ev.(type) {
-		case *codextypes.ThreadStartedEvent:
-			sm.rememberCodexThread(session, e.ThreadID)
-		case codextypes.ItemEvent:
-			sm.applyCodexEmits(session, state.handleItemEvent(e))
-		case *codextypes.TurnCompletedEvent:
-			u := e.Usage
-			usage = &u
-		case *codextypes.TurnFailedEvent:
-			turnErr = &codextypes.TurnFailedError{Message: e.Error.Message}
-		case *codextypes.ThreadErrorEvent:
-			turnErr = &codextypes.ThreadStreamError{Message: e.Message}
-		}
-	}
-
-	if err := stream.Err(); err != nil {
-		if errors.Is(err, context.Canceled) {
-			// Interrupted by the user; InterruptSession owns the session state.
-			return nil
-		}
-		if turnErr == nil {
-			turnErr = err
-		}
-	}
-	if turnErr != nil {
-		return turnErr
-	}
-
-	sm.sendDirectResultMessage(session, start, 1, codexUsageToLLM(usage))
-	return nil
 }
 
 // rememberCodexThread persists the thread id so later prompts resume it.

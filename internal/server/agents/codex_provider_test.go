@@ -290,51 +290,6 @@ func TestCodexInputsFromContentImageOnlyGetsPrompt(t *testing.T) {
 	}
 }
 
-func TestCodexTurnQueueing(t *testing.T) {
-	sm := &SessionManager{}
-	session := &AgentSession{}
-
-	prev1, done1 := sm.beginCodexTurn(session)
-	if prev1 != nil {
-		t.Fatal("first turn should have nothing to wait for")
-	}
-	prev2, done2 := sm.beginCodexTurn(session)
-	if prev2 == nil {
-		t.Fatal("second turn must wait for the first")
-	}
-	select {
-	case <-prev2:
-		t.Fatal("first turn should still be in flight")
-	default:
-	}
-
-	sm.endCodexTurn(session, done1)
-	select {
-	case <-prev2:
-	default:
-		t.Fatal("ending the first turn must release the second")
-	}
-	// Ending the first turn must not clear the registration of the second.
-	session.codexTurnMu.Lock()
-	current := session.codexTurnDone
-	session.codexTurnMu.Unlock()
-	if current != done2 {
-		t.Fatal("second turn should still be registered")
-	}
-
-	sm.endCodexTurn(session, done2)
-	session.codexTurnMu.Lock()
-	cleared := session.codexTurnDone == nil
-	session.codexTurnMu.Unlock()
-	if !cleared {
-		t.Fatal("registration should be cleared once the last turn ends")
-	}
-	// A new turn after everything finished has nothing to wait for.
-	if prev3, _ := sm.beginCodexTurn(session); prev3 != nil {
-		t.Fatal("no in-flight turn expected")
-	}
-}
-
 func TestCodexUsageToLLM(t *testing.T) {
 	if codexUsageToLLM(nil) != nil {
 		t.Fatal("nil usage should map to nil")

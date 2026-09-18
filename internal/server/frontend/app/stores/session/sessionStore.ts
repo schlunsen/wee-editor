@@ -243,6 +243,22 @@ export const useSessionStore = defineStore('session', {
       }
     },
 
+    /** Refresh the list without discarding the conversation currently on screen. */
+    refreshSessions(sessions: Session[]) {
+      const ids = new Set(sessions.map(session => session.id))
+      this.sessions = sessions
+      if (this.activeSessionId && !ids.has(this.activeSessionId)) this.activeSessionId = null
+      for (const id of Object.keys(this.messages)) {
+        if (!ids.has(id)) delete this.messages[id]
+      }
+      for (const id of Object.keys(this.permissions)) {
+        if (!ids.has(id)) delete this.permissions[id]
+      }
+      for (const id of this.messagesLoaded) {
+        if (!ids.has(id)) this.messagesLoaded.delete(id)
+      }
+    },
+
     /**
      * Update an existing session
      */

@@ -81,18 +81,20 @@ type BranchFileChange struct {
 
 // GitStatusData represents the parsed git status
 type GitStatusData struct {
-	Branch       string              `json:"branch"`
-	Ahead        int                 `json:"ahead"`
-	Behind       int                 `json:"behind"`
-	Staged       []string            `json:"staged"`
-	Modified     []string            `json:"modified"`
-	Untracked    []string            `json:"untracked"`
-	Deleted      []string            `json:"deleted"`
-	Clean        bool                `json:"clean"`
-	PR           *GitHubPRInfo       `json:"pr,omitempty"`
-	IsWorktree   bool                `json:"is_worktree,omitempty"`
-	SourceBranch string              `json:"source_branch,omitempty"`
-	BranchFiles  []BranchFileChange  `json:"branch_files,omitempty"`
+	WorkingDirectory string             `json:"working_directory"`
+	WorktreePath     string             `json:"worktree_path"`
+	Branch           string             `json:"branch"`
+	Ahead            int                `json:"ahead"`
+	Behind           int                `json:"behind"`
+	Staged           []string           `json:"staged"`
+	Modified         []string           `json:"modified"`
+	Untracked        []string           `json:"untracked"`
+	Deleted          []string           `json:"deleted"`
+	Clean            bool               `json:"clean"`
+	PR               *GitHubPRInfo      `json:"pr,omitempty"`
+	IsWorktree       bool               `json:"is_worktree,omitempty"`
+	SourceBranch     string             `json:"source_branch,omitempty"`
+	BranchFiles      []BranchFileChange `json:"branch_files,omitempty"`
 }
 
 // GetGitStatus returns the current git status for the given directory
@@ -120,6 +122,12 @@ func GetGitStatus(workingDir string) (*GitStatusData, error) {
 	data, err := parseGitStatusOutput(string(output))
 	if err != nil {
 		return nil, err
+	}
+
+	if workspace, err := inspectSessionWorkspace(workingDir); err == nil {
+		data.WorkingDirectory = workspace.WorkingDirectory
+		data.WorktreePath = workspace.WorktreePath
+		data.IsWorktree = workspace.WorktreePath != ""
 	}
 
 	// Try to get GitHub PR info for the current branch (non-blocking)

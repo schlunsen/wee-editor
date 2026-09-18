@@ -225,6 +225,19 @@ func (sm *SessionManager) runCodexApp(session *AgentSession, run *codexRun, inpu
 				}
 				sm.applyCodexEmits(session, state.handleItemEvent(&codextypes.ItemUpdatedEvent{Type: codextypes.EventTypeItemUpdated, Item: &codextypes.TodoListItem{ID: "plan", Items: todos}}))
 			case "item/started", "item/completed":
+				if event.Method == "item/completed" {
+					var item struct {
+						Type     string `json:"type"`
+						CWD      string `json:"cwd"`
+						Command  string `json:"command"`
+						Status   string `json:"status"`
+						ExitCode *int   `json:"exitCode"`
+					}
+					if json.Unmarshal(p.Item, &item) == nil && item.Type == "commandExecution" && item.Status == "completed" && (item.ExitCode == nil || *item.ExitCode == 0) {
+						dir := workspaceToolDirectory(map[string]interface{}{"cwd": item.CWD, "command": item.Command}, codexWorkingDir(session))
+						sm.observeSessionWorkspace(session, dir)
+					}
+				}
 				emits, e := state.handleAppItem(event.Method, p.Item)
 				if e != nil {
 					return e

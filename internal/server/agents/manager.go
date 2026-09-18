@@ -77,43 +77,44 @@ type UserQuestionAnswerResponse struct {
 // AgentSession represents an active agent session
 type AgentSession struct {
 	Session
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	responseChan         chan types.Message
-	permissionReqChan    chan *PermissionRequest            // Outgoing permission requests to frontend
-	permissionRespChan   chan *PermissionResponse           // Incoming permission responses from frontend
-	pendingPermissions   map[string]chan PermissionResponse // Map of request_id -> response channel
-	permMu               sync.Mutex
-	questionReqChan      chan *UserQuestionRequest                   // Outgoing user questions to frontend
-	pendingQuestions     map[string]chan UserQuestionAnswerResponse // Map of question_id -> response channel
-	pendingQuestionData  map[string]*UserQuestionMessage            // Map of question_id -> question data (for session restore)
-	questionMu           sync.Mutex
+	ctx                      context.Context
+	cancel                   context.CancelFunc
+	responseChan             chan types.Message
+	permissionReqChan        chan *PermissionRequest            // Outgoing permission requests to frontend
+	permissionRespChan       chan *PermissionResponse           // Incoming permission responses from frontend
+	pendingPermissions       map[string]chan PermissionResponse // Map of request_id -> response channel
+	permMu                   sync.Mutex
+	questionReqChan          chan *UserQuestionRequest                  // Outgoing user questions to frontend
+	pendingQuestions         map[string]chan UserQuestionAnswerResponse // Map of question_id -> response channel
+	pendingQuestionData      map[string]*UserQuestionMessage            // Map of question_id -> question data (for session restore)
+	questionMu               sync.Mutex
 	questionForwarderRunning bool // Track if question forwarder goroutine is running
 	questionForwarderMu      sync.Mutex
-	permForwarderRunning bool // Track if permission forwarder goroutine is running
-	permForwarderMu      sync.Mutex
-	wsConnected          bool // Track WebSocket connection state
-	wsConnMu             sync.Mutex
-	active               bool
-	client               *claude.Client // Streaming client for this session
-	mu                   sync.Mutex     // Protects client field
-	pendingReload        bool           // Track if we should reload after next message
-	pendingReloadMu      sync.Mutex     // Protects pendingReload field
-	interruptionSaved    bool           // Track if interruption message was saved for this cycle
-	interruptionMu       sync.Mutex     // Protects interruptionSaved field
-	subscribedProjects   map[string]bool // Map of projectID -> true for projects this session is subscribed to
-	subscribedProjectsMu sync.Mutex      // Protects subscribedProjects field
-	gitStatusCallback    func(*GitStatusData) // Callback for git status updates (set by handler)
-	gitStatusCallbackMu  sync.Mutex          // Protects gitStatusCallback field
-	autoHandoffTriggered bool               // Prevents re-triggering auto-handoff
-	autoHandoffMu        sync.Mutex         // Protects autoHandoffTriggered
-	activeStreamerCount   int32              // Atomic counter for active streamFiberResponses goroutines
-	missedMessageCount   int32              // Atomic counter for messages that used fallback broadcast (channel timeout)
-	directMCPClient      *mcpclient.Client  // Cached MCP client for direct provider sessions
-	directMCPMu          sync.Mutex         // Protects directMCPClient
-	codexRun             *codexRun          // Active app-server run; protected by codexTurnMu
-	codexTurnMu          sync.Mutex         // Protects codexRun
-	respMu               sync.RWMutex       // Guards responseChan: producers RLock while sending, swapResponseChan Locks to swap+close
+	permForwarderRunning     bool // Track if permission forwarder goroutine is running
+	permForwarderMu          sync.Mutex
+	wsConnected              bool // Track WebSocket connection state
+	wsConnMu                 sync.Mutex
+	active                   bool
+	client                   *claude.Client           // Streaming client for this session
+	mu                       sync.Mutex               // Protects client field
+	pendingReload            bool                     // Track if we should reload after next message
+	pendingReloadMu          sync.Mutex               // Protects pendingReload field
+	interruptionSaved        bool                     // Track if interruption message was saved for this cycle
+	interruptionMu           sync.Mutex               // Protects interruptionSaved field
+	subscribedProjects       map[string]bool          // Map of projectID -> true for projects this session is subscribed to
+	subscribedProjectsMu     sync.Mutex               // Protects subscribedProjects field
+	gitStatusCallback        func(*GitStatusData)     // Callback for git status updates (set by handler)
+	gitStatusCallbackMu      sync.Mutex               // Protects gitStatusCallback field
+	autoHandoffTriggered     bool                     // Prevents re-triggering auto-handoff
+	autoHandoffMu            sync.Mutex               // Protects autoHandoffTriggered
+	activeStreamerCount      int32                    // Atomic counter for active streamFiberResponses goroutines
+	missedMessageCount       int32                    // Atomic counter for messages that used fallback broadcast (channel timeout)
+	directMCPClient          *mcpclient.Client        // Cached MCP client for direct provider sessions
+	directMCPMu              sync.Mutex               // Protects directMCPClient
+	workspaceTools           map[string]workspaceTool // Tool observations protected by SessionManager.mu
+	codexRun                 *codexRun                // Active app-server run; protected by codexTurnMu
+	codexTurnMu              sync.Mutex               // Protects codexRun
+	respMu                   sync.RWMutex             // Guards responseChan: producers RLock while sending, swapResponseChan Locks to swap+close
 
 	// Session reader: one per client, for the client's whole life (see ensureSessionReader).
 	readerMu     sync.Mutex         // Guards readerClient and readerCancel
@@ -1155,10 +1156,7 @@ func (sm *SessionManager) RefreshGitBranch(sessionID uuid.UUID) (newBranch strin
 		return "", false, fmt.Errorf("session not found: %s", sessionID)
 	}
 	oldBranch := session.GitBranch
-	var workingDir string
-	if session.Options.WorkingDirectory != nil {
-		workingDir = *session.Options.WorkingDirectory
-	}
+	workingDir := sessionGitDirectory(session)
 	sm.mu.RUnlock()
 
 	// Only refresh if we have a working directory
@@ -1166,21 +1164,11 @@ func (sm *SessionManager) RefreshGitBranch(sessionID uuid.UUID) (newBranch strin
 		return oldBranch, false, nil
 	}
 
-	// Detect current git branch (no lock needed - external command)
-	currentBranch := GetGitBranch(workingDir)
-
-	// Check if it changed
+	sm.observeSessionWorkspace(session, workingDir)
+	sm.mu.RLock()
+	currentBranch := session.GitBranch
+	sm.mu.RUnlock()
 	changed = currentBranch != oldBranch
-
-	if changed {
-		logging.Info("Git branch changed for session %s: %s -> %s", sessionID, oldBranch, currentBranch)
-		sm.mu.Lock()
-		session.GitBranch = currentBranch
-		session.UpdatedAt = time.Now()
-		sessionCopy := session.Session
-		sm.mu.Unlock()
-		sm.updateSessionInDB(&sessionCopy)
-	}
 
 	return currentBranch, changed, nil
 }

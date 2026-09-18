@@ -245,11 +245,11 @@
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </button>
-            <button v-if="session?.git_branch" class="section-refresh" :disabled="gitLoading" aria-label="Refresh Git status" title="Refresh Git status" @click="fetchGitStatus"><Icon name="mdi:refresh" size="18" /></button>
+            <button v-if="hasGitContext" class="section-refresh" :disabled="gitLoading" aria-label="Refresh Git status" title="Refresh Git status" @click="fetchGitStatus"><Icon name="mdi:refresh" size="18" /></button>
           </div>
           <div v-show="expandedSections.gitStatus" class="section-content">
             <!-- No git branch available -->
-            <div v-if="!session?.git_branch" class="git-not-available">
+            <div v-if="!hasGitContext" class="git-not-available">
               <Icon name="mdi:information" class="info-icon" size="20" />
               <span>No git repository detected</span>
             </div>
@@ -265,7 +265,7 @@
               hide-refresh
               :loading="gitLoading"
               :session-id="session?.id"
-              :worktree-path="session?.worktree_path || ''"
+              :worktree-path="gitStatus.worktree_path ?? session?.options?.workspace?.worktree_path ?? session?.worktree_path ?? ''"
               :github-url="githubUrl"
               @refresh="fetchGitStatus"
             />
@@ -285,7 +285,6 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import draggable from 'vuedraggable'
 import { useUIStore } from '~/stores/ui/uiStore'
-import { useProjectSubscriptionsStore } from '~/stores/projects/projectSubscriptionsStore'
 import ProjectPermissions from '~/components/agents/ProjectPermissions.vue'
 import ContextUsageBar from '~/components/agents/ContextUsageBar.vue'
 import GitStatus from '~/components/agents/GitStatus.vue'
@@ -297,9 +296,11 @@ interface SessionMetricsData {
   message_count: number
   error_message?: string
   git_branch?: string
+  worktree_path?: string
   model_name?: string
   project_id?: string
   options?: {
+    workspace?: { working_directory: string; worktree_path: string; branch: string }
     working_directory?: string
     permission_mode?: string
     tools?: string[]
@@ -349,27 +350,35 @@ const gitError = ref<string | null>(null)
 const gitStatusUpdated = ref(false)
 const isInitialGitLoad = ref(true)
 
+const hasGitContext = computed(() => !!(props.session?.options?.workspace?.working_directory || props.session?.options?.working_directory || props.session?.git_branch))
+const workspaceKey = computed(() => [props.session?.id, props.session?.options?.workspace?.working_directory, props.session?.worktree_path, props.session?.options?.working_directory].join('|'))
+let gitRequest = 0
+let gitAbort: AbortController | null = null
 const fetchGitStatus = async () => {
-  if (!props.session?.id) return
-
+  const sessionId = props.session?.id
+  if (!sessionId || !hasGitContext.value) return
+  const request = ++gitRequest
+  gitAbort?.abort()
+  gitAbort = new AbortController()
   gitLoading.value = true
   gitError.value = null
-
   try {
-    const response = await fetch(`/api/agent/sessions/${props.session.id}/git-status`)
-
+    const response = await fetch(`/api/agent/sessions/${sessionId}/git-status`, { signal: gitAbort.signal })
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `HTTP ${response.status}`)
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || `HTTP ${response.status}`)
     }
-
     const data = await response.json()
+    if (request !== gitRequest) return
     gitStatus.value = data
+    gitStatusUpdated.value = !isInitialGitLoad.value
+    isInitialGitLoad.value = false
   } catch (err) {
+    if (request !== gitRequest) return
+    gitStatus.value = null
     gitError.value = err instanceof Error ? err.message : 'Failed to fetch git status'
-    console.error('Failed to fetch git status:', err)
   } finally {
-    gitLoading.value = false
+    if (request === gitRequest) gitLoading.value = false
   }
 }
 
@@ -588,12 +597,13 @@ watch(
   () => gitStatus.value,
   async (status) => {
     if (!status || !props.session?.id) return
+    const key = workspaceKey.value
     // Try to fetch the GitHub remote URL from the session
     try {
       const response = await fetch(`/api/agent/sessions/${props.session.id}/git-remote`)
       if (response.ok) {
         const data = await response.json()
-        if (data.html_url) {
+        if (key === workspaceKey.value && data.html_url) {
           githubUrl.value = data.html_url
         }
       }
@@ -604,129 +614,29 @@ watch(
   { immediate: true }
 )
 
-// Use Pinia store for project subscriptions - much simpler and more reactive!
-const projectSubscriptionsStore = useProjectSubscriptionsStore()
+// Project-level status can belong to a different checkout. Always load the
+// selected session's observed workspace, including changes after startup.
+watch(workspaceKey, () => {
+  ++gitRequest
+  gitAbort?.abort()
+  gitStatus.value = null
+  gitError.value = null
+  gitLoading.value = false
+  githubUrl.value = ''
+  isInitialGitLoad.value = true
+  void fetchGitStatus()
+}, { immediate: true })
 
-// Track current subscription for cleanup
-let currentProjectId: string | null = null
-
-// Computed git status from Pinia store
-const storeGitStatus = computed(() => {
-  if (!props.session?.project_id) {
-    return null
-  }
-  return projectSubscriptionsStore.getProjectGitStatus(props.session.project_id)
+let gitPoll: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  gitPoll = setInterval(() => {
+    if (!gitLoading.value && expandedSections.value.gitStatus) void fetchGitStatus()
+  }, 5000)
 })
-
-// Watch for session changes - handle project vs non-project sessions
-watch(
-  () => props.session?.id,
-  async (newId) => {
-
-
-    // Reset initial load flag for new session
-    isInitialGitLoad.value = true
-
-    // Unsubscribe from previous project if needed
-    if (currentProjectId && props.session?.id) {
-      projectSubscriptionsStore.unsubscribeFromProject(props.session.id, currentProjectId)
-      currentProjectId = null
-    }
-
-    if (!newId) {
-      gitStatus.value = null
-      gitLoading.value = false
-      return
-    }
-
-    // For project sessions, subscribe via the Pinia store
-    if (props.session?.project_id && props.session?.options?.working_directory) {
-
-      currentProjectId = props.session.project_id
-      projectSubscriptionsStore.subscribeToProject(
-        props.session.id,
-        props.session.project_id,
-        props.session.options.working_directory
-      )
-      // Get initial cached status if available
-      const cached = projectSubscriptionsStore.getProjectGitStatus(props.session.project_id)
-      if (cached) {
-        gitStatus.value = cached
-        gitLoading.value = false
-      }
-    } else {
-      // For non-project sessions, listen for git updates on WebSocket
-
-      agentWs?.on('onGitStatusUpdate', (message: any) => {
-        if (message.session_id === newId && !props.session?.project_id) {
-
-          gitStatus.value = message.status
-          gitLoading.value = false
-        }
-      })
-
-      // Load initial git status
-      if (props.session?.git_branch) {
-        await fetchGitStatus()
-      }
-    }
-  }
-)
-
-// Watch Pinia store for git status updates (this is much cleaner!)
-watch(
-  () => storeGitStatus.value,
-  (newStatus) => {
-    if (newStatus && props.session?.project_id) {
-
-      gitStatus.value = newStatus
-      gitLoading.value = false
-
-      // Trigger glow animation only on actual updates (not initial load)
-      if (!isInitialGitLoad.value) {
-        gitStatusUpdated.value = true
-      } else {
-        isInitialGitLoad.value = false
-      }
-    }
-  }
-)
-
-// Initialize on mount - handle case where session is already loaded
-onMounted(async () => {
-
-
-  if (props.session?.id && props.session?.project_id && props.session?.options?.working_directory) {
-    currentProjectId = props.session.project_id
-    projectSubscriptionsStore.subscribeToProject(
-      props.session.id,
-      props.session.project_id,
-      props.session.options.working_directory
-    )
-    const cached = projectSubscriptionsStore.getProjectGitStatus(props.session.project_id)
-    if (cached) {
-      gitStatus.value = cached
-      gitLoading.value = false
-    }
-  } else if (props.session?.id && props.session?.git_branch) {
-    agentWs?.on('onGitStatusUpdate', (message: any) => {
-      if (message.session_id === props.session?.id && !props.session?.project_id) {
-        gitStatus.value = message.status
-        gitLoading.value = false
-      }
-    })
-    await fetchGitStatus()
-  }
-})
-
-// Cleanup on unmount
 onBeforeUnmount(() => {
-  if (currentProjectId && props.session?.id) {
-    projectSubscriptionsStore.unsubscribeFromProject(props.session.id, currentProjectId)
-  }
-  if (agentWs) {
-    agentWs.off('onGitStatusUpdate')
-  }
+  ++gitRequest
+  gitAbort?.abort()
+  if (gitPoll) clearInterval(gitPoll)
 })
 </script>
 

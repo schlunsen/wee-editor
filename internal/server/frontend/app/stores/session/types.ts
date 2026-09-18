@@ -73,6 +73,7 @@ export interface Message {
  * Session options and configuration
  */
 export interface SessionOptions {
+  workspace?: { working_directory: string; worktree_path: string; branch: string }
   system_prompt?: string | null
   agent_name?: string | null
   tools?: string[]

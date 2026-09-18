@@ -624,10 +624,12 @@ func (h *AgentSessionHandler) HandleGetGitStatus(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract working directory from session
-	workingDirectory := ""
-	if session.Options.WorkingDirectory != nil {
-		workingDirectory = *session.Options.WorkingDirectory
+	// The agent may have moved into a worktree after the session was created,
+	// so resolve the directory it is actually working in now.
+	_, _, _ = h.agentHandler.SessionManager.RefreshGitBranch(sessionID)
+	workingDirectory, err := h.agentHandler.SessionManager.SessionGitDirectory(sessionID)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	// Use fallback if no working directory set
@@ -650,12 +652,12 @@ func (h *AgentSessionHandler) HandleGetGitStatus(c *fiber.Ctx) error {
 	}
 
 	// If this is a worktree session, enrich with branch diff files
-	if session.WorktreePath != "" && agents.IsWorktree(workingDirectory) {
+	if status.IsWorktree {
 		status.IsWorktree = true
 
 		// Try to get source branch from the database worktree record
 		var sourceBranch string
-		if session.WorktreeID != nil {
+		if session.WorktreeID != nil && session.WorktreePath == status.WorktreePath {
 			wt, err := h.repo.GetWorktree(*session.WorktreeID)
 			if err == nil && wt.SourceBranch != nil {
 				sourceBranch = *wt.SourceBranch

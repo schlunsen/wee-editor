@@ -43,16 +43,17 @@
     <div class="session-info">
       <div class="session-name">{{ effectiveAvatar?.name || `Session ${session.id.slice(0, 8)}` }}</div>
       <div v-if="session.options?.model" class="session-model">{{ session.options.model }}</div>
-      <div v-if="session.git_branch" class="session-branch" :title="session.git_branch">
+      <div v-if="workspaceBranch" class="session-branch" :title="workspaceBranch">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <line x1="6" y1="3" x2="6" y2="15"></line>
           <circle cx="18" cy="6" r="3"></circle>
           <circle cx="6" cy="18" r="3"></circle>
           <path d="M18 9a9 9 0 0 1-9 9"></path>
         </svg>
-        <span>{{ session.git_branch }}</span>
-        <span v-if="session.worktree_path" class="worktree-badge" title="Working in a worktree">WT</span>
+        <span>{{ workspaceBranch }}</span>
+        <span v-if="workspacePath" class="worktree-badge" :title="`Worktree: ${workspacePath}`">WT</span>
       </div>
+      <div v-if="workspacePath" class="session-worktree" :title="workspacePath">{{ workspacePath.split('/').filter(Boolean).pop() }}</div>
       <div class="session-meta">
         <span class="session-id">{{ session.id.slice(0, 8) }}</span>
         <span v-if="session.project_area" class="session-area-badge" :style="{ backgroundColor: session.project_area.color }">
@@ -195,6 +196,7 @@ interface Session {
   git_branch?: string
   worktree_path?: string
   options?: {
+    workspace?: { working_directory: string; worktree_path: string; branch: string }
     model?: string
     enable_rtk?: boolean
     enabled_skill_ids?: number[]
@@ -237,6 +239,10 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   isFocused: false
 })
+// An empty observed path means the agent returned to the main checkout.
+const workspacePath = computed(() => props.session.options?.workspace?.worktree_path ?? props.session.worktree_path ?? '')
+const workspaceBranch = computed(() => props.session.options?.workspace?.branch ?? props.session.git_branch ?? '')
+
 const emit = defineEmits<{
   (e: 'select', sessionId: string): void
   (e: 'end', sessionId: string): void
@@ -666,6 +672,14 @@ const formatTokens = (tokens: number | undefined): string => {
 .session-branch span {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.session-worktree {
+  color: var(--text-secondary);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .worktree-badge {

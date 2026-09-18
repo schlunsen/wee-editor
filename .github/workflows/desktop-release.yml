@@ -6,6 +6,9 @@ on:
       - 'desktop-v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -82,16 +85,34 @@ jobs:
           GOOS: ${{ matrix.go_os }}
           GOARCH: ${{ matrix.go_arch }}
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+      # Tauri signs and notarizes whenever APPLE_CERTIFICATE is set in the
+      # environment - even when it is empty - so only export the Apple
+      # variables when the secret actually exists. Without them the macOS
+      # bundle is built unsigned.
+      - name: Configure Apple code signing
+        if: matrix.go_os == 'darwin'
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "APPLE_CERTIFICATE secret not set; building an unsigned macOS bundle."
+            exit 0
+          fi
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            printf '%s<<__WEE_EOF__\n%s\n__WEE_EOF__\n' "$name" "${!name}" >> "$GITHUB_ENV"
+          done
+          echo "Apple code signing configured."
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Wee Desktop ${{ github.ref_name }}'

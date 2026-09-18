@@ -13,8 +13,12 @@ default:
     @just --list
 
 # Build the application (with frontend)
-build: build-frontend build-go
-    @echo "🎉 {{wee}} is ready: ./{{wee}}"
+build:
+    @node scripts/build.mjs
+
+# Install the optional 3D horse build splash (requires Git, CMake and C++17)
+setup-splash:
+    @node scripts/setup-splash.mjs
 
 # Every build/test recipe below runs through a wrapper in scripts/ that hides the
 # thousands of lines of tool chatter and prints a short summary instead. The

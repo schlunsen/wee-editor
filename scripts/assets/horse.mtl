@@ -1,0 +1,6 @@
+newmtl coat
+Kd 0.66 0.39 0.20
+newmtl muzzle
+Kd 0.30 0.20 0.17
+newmtl dark
+Kd 0.095 0.075 0.07

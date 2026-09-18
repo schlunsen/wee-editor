@@ -217,6 +217,10 @@ export interface UserQuestion {
     description: string
   }>
   multiSelect: boolean
+  /** 1-based position within a multi-question AskUserQuestion call */
+  questionIndex?: number
+  /** Number of questions in the AskUserQuestion call */
+  questionTotal?: number
   status: 'pending' | 'answered'
   timestamp: Date
   answers?: string[]

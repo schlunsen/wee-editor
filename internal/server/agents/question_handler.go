@@ -69,6 +69,19 @@ func (h *AgentHandler) handleFiberUserQuestionResponse(c *fiberws.Conn, data map
 		return h.safeWriteJSON(c, ackMsg)
 	}
 
+	// Acknowledge to the frontend *before* delivering the answer. Delivering
+	// first would let the permission forwarder broadcast the next question of a
+	// multi-question AskUserQuestion call ahead of this ack, and the frontend
+	// would then close the freshly opened modal when the stale ack arrived.
+	ackMsg := map[string]interface{}{
+		"type":        string(MessageTypeUserQuestionAcknowledged),
+		"session_id":  sessionID.String(),
+		"question_id": questionID,
+	}
+	if err := h.safeWriteJSON(c, ackMsg); err != nil {
+		logging.Error("Failed to send question acknowledgment: %v", err)
+	}
+
 	// Send the answer to the waiting callback
 	// NOTE: The permission callback (forwardPermissionRequests) handles cleanup of pendingQuestions
 	// after receiving the answer, so we don't delete here to avoid race conditions.
@@ -79,18 +92,6 @@ func (h *AgentHandler) handleFiberUserQuestionResponse(c *fiberws.Conn, data map
 		logging.Info("✅ Answer successfully sent to SDK callback for question_id=%s", questionID)
 	case <-time.After(3 * time.Second):
 		logging.Error("❌ Timeout sending answer to SDK callback for question_id=%s", questionID)
-	}
-
-	// Send acknowledgment to frontend (modal can close)
-	ackMsg := map[string]interface{}{
-		"type":        string(MessageTypeUserQuestionAcknowledged),
-		"session_id":  sessionID.String(),
-		"question_id": questionID,
-	}
-
-	if err := h.safeWriteJSON(c, ackMsg); err != nil {
-		logging.Error("Failed to send question acknowledgment: %v", err)
-		return err
 	}
 
 	return nil

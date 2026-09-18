@@ -2717,6 +2717,10 @@ const setupStoreBasedHandlers = () => {
       ...data,
       id: data.question_id,
       sessionId: data.session_id,
+      // Backend JSON uses snake_case; the UserQuestion type is camelCase.
+      multiSelect: data.multi_select ?? data.multiSelect ?? false,
+      questionIndex: data.question_index,
+      questionTotal: data.question_total,
       timestamp: new Date(),
       status: 'pending' as const
     }
@@ -2736,6 +2740,15 @@ const setupStoreBasedHandlers = () => {
   // User Question Acknowledged Handler
   agentWs.on('onUserQuestionAcknowledged', (data) => {
     console.log('✅ User question acknowledged:', data.question_id)
+
+    // A multi-question AskUserQuestion call sends the next question right
+    // after each answer; only act on the ack for the question we are showing
+    // so a late ack can't close the next question's modal.
+    if (currentUserQuestion.value && currentUserQuestion.value.id !== data.question_id) {
+      console.log('⏭️ Ignoring ack for a question that is no longer shown:', data.question_id)
+      sessionStore.removeQuestion(data.session_id, data.question_id)
+      return
+    }
 
     // Add the user's answer to the chat as a message
     if (currentUserQuestion.value) {

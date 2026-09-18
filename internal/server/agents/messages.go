@@ -596,13 +596,15 @@ type QuestionOption struct {
 // UserQuestionMessage represents a question with multiple choice options
 type UserQuestionMessage struct {
 	BaseMessage
-	SessionID    uuid.UUID        `json:"session_id"`
-	QuestionID   string           `json:"question_id"`
-	Question     string           `json:"question"`
-	Header       string           `json:"header"`         // Short label (max 12 chars)
-	Options      []QuestionOption `json:"options"`        // 2-4 options
-	MultiSelect  bool             `json:"multi_select"`   // Allow multiple selections
-	Timestamp    time.Time        `json:"timestamp"`
+	SessionID     uuid.UUID        `json:"session_id"`
+	QuestionID    string           `json:"question_id"`
+	Question      string           `json:"question"`
+	Header        string           `json:"header"`         // Short label (max 12 chars)
+	Options       []QuestionOption `json:"options"`        // 2-4 options
+	MultiSelect   bool             `json:"multi_select"`   // Allow multiple selections
+	QuestionIndex int              `json:"question_index"` // 1-based position within a multi-question tool call
+	QuestionTotal int              `json:"question_total"` // Number of questions in the tool call
+	Timestamp     time.Time        `json:"timestamp"`
 }
 
 // UserQuestionResponseMessage represents a user's answer

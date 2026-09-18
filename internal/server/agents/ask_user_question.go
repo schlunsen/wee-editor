@@ -40,14 +40,16 @@ func (h *AgentHandler) handleAskUserQuestion(sessionID uuid.UUID, session *Agent
 	for i, q := range questions {
 		questionID := uuid.New().String()
 		questionMsg := UserQuestionMessage{
-			BaseMessage: BaseMessage{Type: MessageTypeUserQuestion},
-			SessionID:   sessionID,
-			QuestionID:  questionID,
-			Question:    q.Question,
-			Header:      q.Header,
-			Options:     q.Options,
-			MultiSelect: q.MultiSelect,
-			Timestamp:   time.Now(),
+			BaseMessage:   BaseMessage{Type: MessageTypeUserQuestion},
+			SessionID:     sessionID,
+			QuestionID:    questionID,
+			Question:      q.Question,
+			Header:        q.Header,
+			Options:       q.Options,
+			MultiSelect:   q.MultiSelect,
+			QuestionIndex: i + 1,
+			QuestionTotal: len(questions),
+			Timestamp:     time.Now(),
 		}
 
 		answerChan := make(chan UserQuestionAnswerResponse, 1)

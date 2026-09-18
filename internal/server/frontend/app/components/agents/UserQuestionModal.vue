@@ -6,7 +6,12 @@
         <div class="modal-header">
           <div class="modal-icon">❓</div>
           <div class="header-content">
-            <h3 class="modal-title">{{ question.header }}</h3>
+            <h3 class="modal-title">
+              {{ question.header }}
+              <span v-if="question.questionTotal && question.questionTotal > 1" class="modal-step">
+                Question {{ question.questionIndex }} of {{ question.questionTotal }}
+              </span>
+            </h3>
             <p class="modal-subtitle">{{ question.question }}</p>
           </div>
         </div>
@@ -134,8 +139,9 @@ const hasSelection = computed(() => {
   return selectedAnswers.value.length > 0
 })
 
-// Focus modal when shown
-watch(() => props.show, (show) => {
+// Reset selection and focus the modal whenever it is shown or a different
+// question is swapped in (multi-question calls reuse the open modal).
+watch([() => props.show, () => props.question?.id], ([show]) => {
   if (show) {
     selectedAnswers.value = []
     otherSelected.value = false
@@ -316,6 +322,20 @@ onUnmounted(() => {
   letter-spacing: 0.05em;
   color: #3b82f6;
   margin-bottom: 0.5rem;
+}
+
+.modal-step {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-secondary, #9ca3af);
+  background: var(--bg-tertiary, rgba(148, 163, 184, 0.15));
+  vertical-align: middle;
 }
 
 .modal-subtitle {

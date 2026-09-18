@@ -2717,6 +2717,10 @@ const setupStoreBasedHandlers = () => {
       ...data,
       id: data.question_id,
       sessionId: data.session_id,
+      // Backend JSON uses snake_case; the UserQuestion type is camelCase.
+      multiSelect: data.multi_select ?? data.multiSelect ?? false,
+      questionIndex: data.question_index,
+      questionTotal: data.question_total,
       timestamp: new Date(),
       status: 'pending' as const
     }

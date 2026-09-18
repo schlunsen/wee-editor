@@ -1197,6 +1197,8 @@ func (sm *SessionManager) readTurn(ctx context.Context, session *AgentSession, m
 				sm.broadcastSessionUpdate(session)
 			}
 
+			sm.observeWorkspaceMessage(session, msg)
+
 			// Refresh git branch before forwarding message (especially after tool execution)
 			// This ensures the current message will have the updated git branch
 			if _, _, err := sm.RefreshGitBranch(session.ID); err != nil {

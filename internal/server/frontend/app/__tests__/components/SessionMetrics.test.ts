@@ -41,3 +41,55 @@ it('keeps approval skipping off when confirmation is cancelled', async () => {
   wrapper.unmount()
   window.confirm = originalConfirm
 })
+
+it('loads the session worktree after it changes instead of using project status', async () => {
+  const { flushPromises } = await import('@vue/test-utils')
+  let statusCalls = 0
+  const fetchMock = vi.fn(async (url: string) => {
+    const status = url.endsWith('git-status')
+    if (status) statusCalls++
+    return { ok: true, json: async () => status ? {
+      branch: statusCalls === 1 ? 'main' : 'feature/live',
+      worktree_path: statusCalls === 1 ? '' : '/repo/.worktrees/live',
+      clean: false, staged: [], modified: ['changed.go'], untracked: [], deleted: []
+    } : {} }
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const session = { id: 'session', project_id: 'project', status: 'processing', message_count: 1, git_branch: 'main', options: { working_directory: '/repo' } }
+  const wrapper = mount(SessionMetrics, { props: { session }, global: { stubs: { Icon: true, ProjectPermissions: true, ContextUsageBar: true, GitStatus: true } } })
+  await flushPromises()
+  expect(wrapper.findComponent({ name: 'GitStatus' }).props('status').branch).toBe('main')
+  await wrapper.setProps({ session: { ...session, options: { ...session.options, workspace: { working_directory: '/repo/.worktrees/live', worktree_path: '/repo/.worktrees/live', branch: 'feature/live' } } } })
+  await flushPromises()
+  const git = wrapper.findComponent({ name: 'GitStatus' })
+  expect(git.props('worktreePath')).toBe('/repo/.worktrees/live')
+  expect(git.props('status')).toMatchObject({ branch: 'feature/live', modified: ['changed.go'], clean: false })
+  wrapper.unmount()
+  vi.unstubAllGlobals()
+})
+
+it('ignores late Git responses from the previous workspace and clears stale status on errors', async () => {
+  const { flushPromises } = await import('@vue/test-utils')
+  let finishOld: (value: unknown) => void = () => {}
+  const oldResponse = new Promise(resolve => { finishOld = resolve })
+  let statusCalls = 0
+  vi.stubGlobal('fetch', vi.fn((url: string) => {
+    if (!url.endsWith('git-status')) return Promise.resolve({ ok: true, json: async () => ({}) })
+    if (++statusCalls === 1) return oldResponse
+    if (statusCalls === 2) return Promise.resolve({ ok: true, json: async () => ({ branch: 'feature/new', worktree_path: '/new', clean: true }) })
+    return Promise.resolve({ ok: false, json: async () => ({ error: 'Worktree no longer exists' }) })
+  }))
+  const session = { id: 'session', status: 'processing', message_count: 1, git_branch: 'main', options: { working_directory: '/repo' } }
+  const wrapper = mount(SessionMetrics, { props: { session }, global: { stubs: { Icon: true, ProjectPermissions: true, ContextUsageBar: true, GitStatus: true } } })
+  await wrapper.setProps({ session: { ...session, options: { ...session.options, workspace: { working_directory: '/new', worktree_path: '/new', branch: 'feature/new' } } } })
+  await flushPromises()
+  finishOld({ ok: true, json: async () => ({ branch: 'main', worktree_path: '', clean: true }) })
+  await flushPromises()
+  expect(wrapper.findComponent({ name: 'GitStatus' }).props('status').branch).toBe('feature/new')
+  await wrapper.get('button[aria-label="Refresh Git status"]').trigger('click')
+  await flushPromises()
+  expect(wrapper.findComponent({ name: 'GitStatus' }).exists()).toBe(false)
+  expect(wrapper.get('.git-error').text()).toContain('Worktree no longer exists')
+  wrapper.unmount()
+  vi.unstubAllGlobals()
+})

@@ -49,6 +49,7 @@ export interface Session {
     system_prompt?: string
     agent_name?: string
     tools?: string[]
+    workspace?: { working_directory: string; worktree_path: string; branch: string }
     working_directory?: string
     max_tokens?: number
     temperature?: number

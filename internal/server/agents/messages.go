@@ -190,6 +190,7 @@ type AlwaysAllowRule struct {
 
 // SessionOptions holds options for creating an agent session
 type SessionOptions struct {
+	Workspace        *SessionWorkspace `json:"workspace,omitempty"` // Last observed workspace, for Git display only
 	SystemPrompt     *string           `json:"system_prompt,omitempty"`
 	AgentName        *string           `json:"agent_name,omitempty"`
 	Tools            []string          `json:"tools,omitempty"`

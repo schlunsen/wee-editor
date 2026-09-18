@@ -5659,7 +5659,7 @@ dependencies = [
 
 [[package]]
 name = "wee-desktop"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "portpicker",
  "reqwest 0.12.28",

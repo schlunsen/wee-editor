@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - AskUserQuestion Fixes & Agent Overview - Lyra - 2026-09-18
+
+### Added
+- **Cross-project agent overview** - a single screen showing agents across every project
+- **DeepSeek V4 models** - model list updated to the V4 generation
+- **Kimi K3 and GLM-5.3** - model lists synced with the live provider APIs
+- **Friendlier build output** - quieter `just` build, test, lint and deps commands with per-step logs, plus an optional horse build splash
+
+### Fixed
+- **AskUserQuestion answers** - answers are handed back to the agent in the shape the CLI schema expects instead of being rejected; every question in a multi-question call is shown, multi-select works, free-text "Other" answers come through, and a late ack can no longer close the next question's modal
+- **Git status polling** - stop hitting GitHub on every git status refresh
+- **Worktree tracking** - follow the worktree an agent actually works in
+- **Codex follow-ups** - apply follow-up prompts to the active Codex turn
+- **Session reader** - read each session's CLI for its whole life instead of one prompt at a time
+- **Response channel race** - guard the session response channel against concurrent swap and close
+- **Provider failures** - show when a provider is failing instead of spinning forever
+- **Pasted images** - resize pasted images to fit instead of rejecting them, and allow the browser to do the resize under CSP
+- **Themes** - improve theme contrast and Nord header usability
+- **Release packaging** - fix packaging of release binaries
+
+### Changed
+- **Session sidebars** - simplified layout and clearer usage reporting
+- **claude-agent-sdk-go** - bumped to v0.11.2
+- **Tauri** - updated to 2.11.5 with refreshed desktop plugins
+- **GitHub Actions** - bumped setup-go, setup-node, upload-artifact, github-script and tauri-action
+
 ## [1.12.0] - Sandbox Apps & Agent Defaults - Kite - 2026-04-06
 
 ### Added

@@ -583,9 +583,9 @@ func (sm *SessionManager) getAllAgentSessions() []*AgentSession {
 	return sessions
 }
 
-// ListAllSessions returns all sessions (active and ended) from database
+// ListAllSessions combines persisted sessions with their current runtime status.
 func (sm *SessionManager) ListAllSessions(statusFilter string) ([]Session, error) {
-	sessionMetas, err := sm.Storage.ListSessions(statusFilter)
+	sessionMetas, err := sm.Storage.ListSessions("all")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions from storage: %w", err)
 	}
@@ -644,6 +644,35 @@ func (sm *SessionManager) ListAllSessions(statusFilter string) ([]Session, error
 			}
 		}
 
+		// Turns update memory before persistence. Use the running manager as the
+		// authority, including when filtering, so active agents are never hidden
+		// by an idle database snapshot.
+		sm.mu.RLock()
+		live := sm.sessions[session.ID]
+		if live != nil {
+			session.Status = live.Status
+			session.UpdatedAt = live.UpdatedAt
+			session.MessageCount = live.MessageCount
+			session.CostUSD = live.CostUSD
+		}
+		sm.mu.RUnlock()
+		if live != nil {
+			live.permMu.Lock()
+			session.PendingPermissions = len(live.pendingPermissions)
+			live.permMu.Unlock()
+			live.questionMu.Lock()
+			session.PendingQuestions = len(live.pendingQuestions)
+			live.questionMu.Unlock()
+		}
+		if statusFilter != "" && statusFilter != "all" {
+			if statusFilter == "active" {
+				if session.Status == SessionStatusEnded {
+					continue
+				}
+			} else if string(session.Status) != statusFilter {
+				continue
+			}
+		}
 		sessions = append(sessions, session)
 	}
 

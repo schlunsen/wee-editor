@@ -309,34 +309,36 @@ type LoopConfig struct {
 
 // Session represents an agent conversation session
 type Session struct {
-	ID               uuid.UUID      `json:"id"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
-	Status           SessionStatus  `json:"status"`
-	Options          SessionOptions `json:"options"`
-	MessageCount     int            `json:"message_count"`
-	ErrorMessage     *string        `json:"error_message,omitempty"`
-	CostUSD          float64        `json:"cost_usd"`
-	NumTurns         int            `json:"num_turns"`
-	DurationMS       int64          `json:"duration_ms"`
-	ModelName        string         `json:"model_name,omitempty"`
-	ClaudeSessionID  string         `json:"claude_session_id,omitempty"`  // Claude CLI session ID for resuming conversations
-	GitBranch        string         `json:"git_branch,omitempty"`         // Git branch of working directory (if applicable)
-	ParentSessionID  *uuid.UUID     `json:"parent_session_id,omitempty"`  // Parent session ID for handoff lineage
-	ContextSummary   string         `json:"context_summary,omitempty"`    // Summary context from parent session
-	Provider         string         `json:"provider,omitempty"`           // AI provider (anthropic, openrouter, openai, etc.)
-	ProjectID        *string        `json:"project_id,omitempty"`         // Project ID for organizing sessions
-	ProjectAreaID    *string        `json:"project_area_id,omitempty"`    // Project area ID for scoped sessions
-	WorktreeID       *string        `json:"worktree_id,omitempty"`        // Worktree ID if session is using a worktree
-	WorktreePath     string         `json:"worktree_path,omitempty"`      // Filesystem path to the worktree
-	SelectedAvatarID *int64         `json:"selected_avatar_id,omitempty"` // Selected avatar ID for session
-	SelectedAvatar   *Avatar        `json:"selected_avatar,omitempty"`    // Selected avatar object (denormalized)
-	ViewMode         string         `json:"view_mode,omitempty"`          // View mode: live or zen
+	PendingPermissions int            `json:"pending_permissions"`
+	PendingQuestions   int            `json:"pending_questions"`
+	ID                 uuid.UUID      `json:"id"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	Status             SessionStatus  `json:"status"`
+	Options            SessionOptions `json:"options"`
+	MessageCount       int            `json:"message_count"`
+	ErrorMessage       *string        `json:"error_message,omitempty"`
+	CostUSD            float64        `json:"cost_usd"`
+	NumTurns           int            `json:"num_turns"`
+	DurationMS         int64          `json:"duration_ms"`
+	ModelName          string         `json:"model_name,omitempty"`
+	ClaudeSessionID    string         `json:"claude_session_id,omitempty"`  // Claude CLI session ID for resuming conversations
+	GitBranch          string         `json:"git_branch,omitempty"`         // Git branch of working directory (if applicable)
+	ParentSessionID    *uuid.UUID     `json:"parent_session_id,omitempty"`  // Parent session ID for handoff lineage
+	ContextSummary     string         `json:"context_summary,omitempty"`    // Summary context from parent session
+	Provider           string         `json:"provider,omitempty"`           // AI provider (anthropic, openrouter, openai, etc.)
+	ProjectID          *string        `json:"project_id,omitempty"`         // Project ID for organizing sessions
+	ProjectAreaID      *string        `json:"project_area_id,omitempty"`    // Project area ID for scoped sessions
+	WorktreeID         *string        `json:"worktree_id,omitempty"`        // Worktree ID if session is using a worktree
+	WorktreePath       string         `json:"worktree_path,omitempty"`      // Filesystem path to the worktree
+	SelectedAvatarID   *int64         `json:"selected_avatar_id,omitempty"` // Selected avatar ID for session
+	SelectedAvatar     *Avatar        `json:"selected_avatar,omitempty"`    // Selected avatar object (denormalized)
+	ViewMode           string         `json:"view_mode,omitempty"`          // View mode: live or zen
 	// OwnerUserID contains the session owner identifier:
 	// - New format (v6+): UUID from users.id column (via owner_uuid)
 	// - Legacy format: username string from users.username (via owner_user_id)
 	// SECURITY: for multi-user access control and session ownership tracking
-	OwnerUserID      *string        `json:"owner_user_id,omitempty"`
+	OwnerUserID *string `json:"owner_user_id,omitempty"`
 }
 
 // Avatar represents an individual avatar within a theme

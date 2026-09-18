@@ -116,12 +116,12 @@ export const useKeyboardShortcuts = () => {
     const shortcutKey = `${modifiers.shift ? 'shift+' : ''}${modifiers.alt ? 'alt+' : ''}${modifiers.meta ? 'meta+' : ''}${modifiers.ctrl ? 'ctrl+' : ''}${key}`
 
     // Allow certain shortcuts to work even in input fields
-    const inputSafeShortcuts = ['shift+alt+meta+p', 'shift+alt+meta+j']
+    const inputSafeShortcuts = ['shift+alt+meta+p', 'shift+alt+meta+j', 'shift+meta+o', 'shift+ctrl+o']
     if (inputSafeShortcuts.includes(shortcutKey)) {
       const shortcut = shortcuts.value.get(shortcutKey)
       if (shortcut) {
         event.preventDefault()
-        shortcut.action()
+        if (!event.repeat) shortcut.action()
         return
       }
     }

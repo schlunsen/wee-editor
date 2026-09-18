@@ -1,6 +1,6 @@
 <template>
-  <div id="app">
-    <nav class="navbar">
+  <div id="app" :class="{ 'overview-open': overviewOpen }">
+    <nav class="navbar" :inert="overviewOpen">
       <div
         v-if="projectColor && colorStyle !== 'off'"
         class="navbar-color-gradient"
@@ -21,6 +21,8 @@
           <div class="nav-project-selector">
             <ProjectSelector />
           </div>
+
+          <button class="overview-toggle" title="Agent overview (Shift+Cmd+O)" aria-label="Open agent overview" @click="toggleOverview">▥</button>
 
           <!-- Settings dropdown -->
           <div class="settings-menu" ref="settingsMenuRef" @keydown.esc.stop.prevent="closeSettingsMenu(); settingsButtonRef?.focus()">
@@ -166,6 +168,7 @@
     </nav>
 
     <div class="app-layout">
+      <div class="editor-workspace" :inert="overviewOpen">
       <!-- Mobile sidebar overlay backdrop -->
       <div
         v-if="!isCollapsed"
@@ -176,10 +179,14 @@
       <main class="main-content" :class="{ 'main-content-expanded': isCollapsed }">
         <slot />
       </main>
+      </div>
+      <Transition name="overview-reveal">
+        <AgentOverview v-if="overviewOpen" :navigation-error="overviewNavigationError" @close="toggleOverview" @select="openOverviewAgent" />
+      </Transition>
     </div>
 
     <!-- Bottom bar: Just jobs + Active Sessions Toolbar -->
-    <div class="bottom-bar-container">
+    <div class="bottom-bar-container" :inert="overviewOpen">
       <JustJobIndicator />
       <ToolbarActiveSessionsToolbar />
     </div>
@@ -198,6 +205,9 @@
 
 <script setup>
 import '../assets/css/main.css'
+import AgentOverview from '~/components/agents/AgentOverview.vue'
+import { openOverviewAgent as navigateToOverviewAgent } from '~/utils/agents/openOverviewAgent'
+import { markOverviewReviewed } from '~/utils/agents/overviewState'
 import { storeToRefs } from 'pinia'
 import lottie from 'lottie-web'
 import { useSessionStore } from '~/stores/session/sessionStore'
@@ -205,6 +215,37 @@ import { useProjectColorSettings } from '~/composables/useProjectColorSettings'
 import { useDebugLogger } from '~/composables/useDebugLogger'
 import { useTunnel } from '~/composables/useTunnel'
 import { useCatActivity } from '~/composables/useCatActivity'
+
+const overviewOpen = ref(false)
+const overviewNavigationError = ref('')
+let openingOverviewAgent = false
+const { fetchWithAuth: fetchOverviewProject } = useAuthenticatedFetch()
+let previousOverviewFocus = null
+function toggleOverview() {
+  if (!overviewOpen.value) {
+    previousOverviewFocus = document.activeElement
+    overviewOpen.value = true
+  } else {
+    overviewOpen.value = false
+    nextTick(() => { if (previousOverviewFocus?.isConnected) previousOverviewFocus.focus() })
+  }
+}
+
+async function openOverviewAgent(agent) {
+  if (openingOverviewAgent) return
+  openingOverviewAgent = true
+  overviewNavigationError.value = ''
+  try {
+    await navigateToOverviewAgent(agent, { store: sessionStore, router, fetchWithAuth: fetchOverviewProject })
+    markOverviewReviewed(agent)
+    overviewOpen.value = false
+    if (isCollapsed.value) toggleSidebar()
+  } catch (error) {
+    overviewNavigationError.value = error.message || 'Could not open this agent. Please try again.'
+  } finally {
+    openingOverviewAgent = false
+  }
+}
 
 // Initialize theme system
 const { isDark } = useTheme()
@@ -451,6 +492,8 @@ onMounted(async () => {
 
   // Initialize keyboard shortcuts
   registerDefaultShortcuts()
+  registerShortcut('o', 'Toggle agent overview', 'Agents', toggleOverview, { shift: true, alt: false, meta: true, ctrl: false })
+  registerShortcut('o', 'Toggle agent overview', 'Agents', toggleOverview, { shift: true, alt: false, meta: false, ctrl: true })
 
   // Close menus on click outside
   document.addEventListener('click', (e) => {
@@ -911,10 +954,25 @@ onUnmounted(() => {
 }
 
 .app-layout {
+  position: relative;
   display: flex;
   flex: 1;
   overflow: hidden;
   min-height: 0;
+}
+
+.editor-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.overview-toggle { border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 22px; cursor: pointer; padding: 2px 9px; }
+.editor-workspace :deep(.sidebar), .editor-workspace :deep(.sessions-sidebar), .editor-workspace :deep(.metrics-sidebar) { transition: transform .32s cubic-bezier(.22,.7,.25,1), opacity .25s ease; }
+.editor-workspace :deep(.chat-area-with-metrics) { transition: opacity .22s ease; }
+.overview-open .editor-workspace :deep(.sidebar), .overview-open .editor-workspace :deep(.sessions-sidebar) { transform: translateX(-110%); opacity: 0; }
+.overview-open .editor-workspace :deep(.metrics-sidebar) { transform: translateX(110%); opacity: 0; }
+.overview-open .editor-workspace :deep(.chat-area-with-metrics) { opacity: 0; }
+.overview-reveal-enter-active { transition: opacity .28s .1s ease, transform .35s .08s cubic-bezier(.22,.7,.25,1); }
+.overview-reveal-leave-active { transition: opacity .18s ease, transform .22s ease; }
+.overview-reveal-enter-from, .overview-reveal-leave-to { opacity: 0; transform: translateY(18px) scale(.985); }
+@media (prefers-reduced-motion: reduce) {
+  .editor-workspace :deep(.sidebar), .editor-workspace :deep(.sessions-sidebar), .editor-workspace :deep(.metrics-sidebar), .editor-workspace :deep(.chat-area-with-metrics), .overview-reveal-enter-active, .overview-reveal-leave-active { transition: none; }
 }
 
 .main-content {

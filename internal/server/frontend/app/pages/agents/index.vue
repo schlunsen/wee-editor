@@ -348,8 +348,9 @@
 
 <script setup lang="ts">
 import SessionMetrics from '~/components/SessionMetrics.vue'
-import { ref, computed, watch, nextTick, onMounted, onUnmounted, inject } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, inject, unref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAgentRouteNavigation } from '~/composables/agents/useAgentRouteNavigation'
 import type { ActiveTool } from '~/types/agents'
 
 // Refactored Components
@@ -420,6 +421,7 @@ const agentWs = inject('agentWs')
 
 // Get route for query parameter handling
 const route = useRoute()
+const router = useRouter()
 
 // Phase 4 Migration: Initialize Pinia Stores (non-breaking, runs alongside old composables)
 const sessionStore = useSession()
@@ -955,6 +957,7 @@ const selectSession = async (sessionId: string) => {
 
   // 4. Call base session selection logic (loads messages via WebSocket)
   await selectSessionBase(sessionId)
+  if (sessionStore.activeSessionId !== sessionId) return
 
   // 5. Sync selected project if the session belongs to a different project
   const switchedSession = sessionStore.sessions.find(s => s.id === sessionId)
@@ -964,7 +967,7 @@ const selectSession = async (sessionId: string) => {
       if (response.ok) {
         const data = await response.json()
         const project = data.project
-        if (project) {
+        if (project && sessionStore.activeSessionId === sessionId) {
           sessionStore.syncSelectedProjectForSession(project)
         }
       }
@@ -2846,11 +2849,8 @@ const setupStoreBasedHandlers = () => {
     // Convert Map back to array
     const deduplicatedSessions = Array.from(sessionMap.values())
 
-    // Clear and repopulate sessions in store
-    sessionStore.clearAll()
-    deduplicatedSessions.forEach((session: any) => {
-      sessionStore.createSession(session)
-    })
+    // A reconnect/list refresh must not erase the selected conversation.
+    sessionStore.refreshSessions(deduplicatedSessions)
 
     // Populate avatar data for all sessions that have selected_avatar_id
     deduplicatedSessions.forEach((session: any) => {
@@ -3472,39 +3472,15 @@ onUnmounted(() => {
 })
 
 // Watch for connection changes
-watch(() => agentWs.connected, (connected) => {
+watch(() => unref(agentWs.connected), (connected) => {
   if (connected) {
     agentWs.send({ type: 'list_sessions' })
   }
 })
 
-// Watch for project query parameter changes in URL
-// Only react when the param actively changes while on the agents page
-// (not when navigating away to a different route)
-watch(() => route.query.project, async (projectId, oldProjectId) => {
-  // Skip if we've navigated away from the agents page — the watcher can fire
-  // during route transitions before the component is unmounted
-  if (route.path !== '/agents') return
-
-  if (projectId && typeof projectId === 'string') {
-    // If the store already has this project selected, skip
-    if (sessionStore.selectedProject?.id === projectId) return
-
-    // Fetch the full project object before setting it
-    try {
-      const { fetchWithAuth } = useAuthenticatedFetch()
-      const response = await fetchWithAuth(`/api/projects/${projectId}`)
-      if (response.ok) {
-        const project = await response.json()
-        sessionStore.setSelectedProject(project)
-      }
-    } catch (err) {
-      console.error('Failed to fetch project for selector:', err)
-    }
-  } else if (projectId === undefined && oldProjectId !== undefined) {
-    // Only clear if the project param was explicitly removed (had a value before)
-    sessionStore.setSelectedProject(null)
-  }
+useAgentRouteNavigation({
+  route, router, sessionStore, connected: () => Boolean(unref(agentWs.connected)),
+  selectSession, fetchWithAuth
 })
 
 // Watch for new messages and auto-scroll if user is near bottom

@@ -1,0 +1,25 @@
+import { ref, readonly } from 'vue'
+
+it('toggles the overview shortcut from the composer and ignores held-key repeats', async () => {
+  vi.stubGlobal('ref', ref)
+  vi.stubGlobal('readonly', readonly)
+  vi.stubGlobal('useRouter', () => ({}))
+  const { useKeyboardShortcuts } = await import('../../composables/useKeyboardShortcuts')
+  const shortcuts = useKeyboardShortcuts()
+  const toggle = vi.fn()
+  const modifiers = { shift: true, alt: false, meta: true, ctrl: false }
+  shortcuts.registerShortcut('o', 'Overview', 'Agents', toggle, modifiers)
+  shortcuts.initializeShortcuts()
+  const input = document.createElement('textarea')
+  document.body.append(input)
+  input.focus()
+  const fire = (repeat = false) => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'O', code: 'KeyO', shiftKey: true, metaKey: true, repeat, bubbles: true, cancelable: true }))
+  expect(fire()).toBe(false)
+  fire(true)
+  fire()
+  expect(toggle).toHaveBeenCalledTimes(2)
+  shortcuts.cleanupShortcuts()
+  shortcuts.unregisterShortcut('o', modifiers)
+  input.remove()
+  vi.unstubAllGlobals()
+})

@@ -550,6 +550,9 @@ export function useSessionActions(params: SessionActionParams) {
       await new Promise(resolve => setTimeout(resolve, 200))
     }
 
+    // Another selection may have won while this restored session was loading.
+    if (activeSessionId.value !== sessionId) return
+
     // CRITICAL: Subscribe to session to receive pending questions and status updates
     // This is separate from create_session - it tells the backend we're actively viewing this session
     // The backend will send any pending questions (modal restoration) on subscribe

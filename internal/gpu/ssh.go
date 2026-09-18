@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -150,9 +149,9 @@ func (m *Manager) Shell() error {
 			return fmt.Errorf("failed to request PTY: %w", err)
 		}
 
-		// Handle window size changes
+		// Handle window size changes (no-op on Windows, see winch_windows.go)
 		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGWINCH)
+		notifyWindowChange(sigCh)
 		go func() {
 			for range sigCh {
 				if newW, newH, err := term.GetSize(fd); err == nil {

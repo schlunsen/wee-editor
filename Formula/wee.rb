@@ -1,35 +1,33 @@
 class Wee < Formula
   desc "Wee - Control center and wrapper for Claude Code"
   homepage "https://github.com/schlunsen/wee-editor"
-  version "1.8.0"
+  version "1.15.0"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/schlunsen/wee-editor/releases/download/v1.8.0/wee-darwin-arm64.tar.gz"
-      sha256 "4d6eb3cdf927f05e6842842b714e295a9dd8db641b28b1d586ef5e975ee8070f"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v1.15.0/wee-darwin-arm64.tar.gz"
+      sha256 "a067fbf7d294fc158e9d420adb3f6423fa1291dc7021dbc963a9f12a1e8abea2"
     else
-      url "https://github.com/schlunsen/wee-editor/releases/download/v1.8.0/wee-darwin-amd64.tar.gz"
-      sha256 "3fccbf96f315a4ab1ce2b0a238f9caf198c77f128eca379376db22ac16815ada"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v1.15.0/wee-darwin-amd64.tar.gz"
+      sha256 "3a860ec051f63214019e223c7695004ae694f7584da1f2ef629e370384bf2c70"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/schlunsen/wee-editor/releases/download/v1.8.0/wee-linux-arm64"
-      sha256 "b3bcb7a55665fab6ebf97dbf9c64d15e5519d2da80acbfa60d6a9fe381d9d8d5"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v1.15.0/wee-linux-arm64.tar.gz"
+      sha256 "eda4d2df398ba0fd4a3aa128fbe1d4a3f9e6f7b03e5bc8879d74b3dd785a2cf6"
     else
-      url "https://github.com/schlunsen/wee-editor/releases/download/v1.8.0/wee-linux-amd64"
-      sha256 "62930d2ddb71fdb43cbb6cc2a7fe90987acb4926bfd03ad9f2a9911b89cbcd92"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v1.15.0/wee-linux-amd64.tar.gz"
+      sha256 "0d26a3251bb0407c692aa365ce91e4191fdc5bfabd20fb3ae4b9ead9ebb94782"
     end
   end
 
   def install
-    if OS.mac?
-      bin.install "bin/wee"
-      (lib/"wee").install Dir["lib/*.dylib"]
-    else
-      bin.install Dir["wee-*"].first => "wee"
-    end
+    # Every release tarball ships bin/wee plus its runtime libraries in lib/.
+    # The binary's rpath is <exe>/../lib on both platforms, so keep that layout.
+    bin.install "bin/wee"
+    lib.install Dir["lib/*"]
   end
 
   test do

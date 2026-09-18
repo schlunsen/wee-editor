@@ -15,21 +15,19 @@ class Wee < Formula
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/schlunsen/wee-editor/releases/download/v{{VERSION}}/wee-linux-arm64"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v{{VERSION}}/wee-linux-arm64.tar.gz"
       sha256 "{{SHA256_LINUX_ARM64}}"
     else
-      url "https://github.com/schlunsen/wee-editor/releases/download/v{{VERSION}}/wee-linux-amd64"
+      url "https://github.com/schlunsen/wee-editor/releases/download/v{{VERSION}}/wee-linux-amd64.tar.gz"
       sha256 "{{SHA256_LINUX_AMD64}}"
     end
   end
 
   def install
-    if OS.mac?
-      bin.install "bin/wee"
-      (lib/"wee").install Dir["lib/*.dylib"]
-    else
-      bin.install Dir["wee-*"].first => "wee"
-    end
+    # Every release tarball ships bin/wee plus its runtime libraries in lib/.
+    # The binary's rpath is <exe>/../lib on both platforms, so keep that layout.
+    bin.install "bin/wee"
+    lib.install Dir["lib/*"]
   end
 
   test do

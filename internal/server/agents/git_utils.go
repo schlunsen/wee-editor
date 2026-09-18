@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 // GetGitBranch returns the current git branch for the given directory.
@@ -302,7 +305,33 @@ func ParseGitHubRepoFromURL(remoteURL string) (owner, repo string, err error) {
 	return parts[0], parts[1], nil
 }
 
-// GetGitHubPRForBranch checks if there's a GitHub PR for the current branch using gh CLI
+// githubPRCacheTTL bounds how stale PR information may be. The GitHub lookup is
+// the only network call in the git status path, and that path is polled: the
+// project watcher refreshes every 2s and the agent overview asks once per agent.
+// Without caching that is thousands of `gh` invocations an hour, which exhausts
+// the GitHub API rate limit. PR state changes rarely, so serving it from a short
+// cache costs nothing and removes almost all of the traffic.
+const githubPRCacheTTL = 2 * time.Minute
+
+// githubPRTimeout stops a wedged `gh` call from blocking a watcher poll forever.
+const githubPRTimeout = 10 * time.Second
+
+type githubPRCacheEntry struct {
+	info      *GitHubPRInfo
+	fetchedAt time.Time
+}
+
+var (
+	githubPRMu    sync.Mutex
+	githubPRCache = map[string]githubPRCacheEntry{}
+	githubPRLocks = map[string]*sync.Mutex{}
+	// Swapped out in tests.
+	githubPRFetch = fetchGitHubPRForBranch
+	githubPRNow   = time.Now
+)
+
+// GetGitHubPRForBranch checks if there's a GitHub PR for the current branch using
+// gh CLI, serving repeated lookups for the same branch from a short-lived cache.
 func GetGitHubPRForBranch(workingDir string) (*GitHubPRInfo, error) {
 	if !IsGitRepository(workingDir) {
 		return nil, fmt.Errorf("not a git repository")
@@ -319,8 +348,80 @@ func GetGitHubPRForBranch(workingDir string) (*GitHubPRInfo, error) {
 		return nil, fmt.Errorf("gh CLI not found")
 	}
 
-	// Use gh CLI to check for PR
-	cmd := exec.Command("gh", "pr", "view", branch, "--json", "number,title,url,state")
+	return cachedGitHubPR(workingDir+"\x00"+branch, func() (*GitHubPRInfo, error) {
+		return githubPRFetch(workingDir, branch)
+	})
+}
+
+// cachedGitHubPR returns a cached lookup when one is fresh, and otherwise runs
+// fetch once on behalf of every caller waiting on the same key. A branch with no
+// PR is cached too: that is the common case, and it used to re-run `gh` on every
+// single poll.
+func cachedGitHubPR(key string, fetch func() (*GitHubPRInfo, error)) (*GitHubPRInfo, error) {
+	if info, ok := lookupGitHubPR(key); ok {
+		return info, nil
+	}
+
+	lock := githubPRKeyLock(key)
+	lock.Lock()
+	defer lock.Unlock()
+
+	// Another caller may have populated the cache while we waited for the lock.
+	if info, ok := lookupGitHubPR(key); ok {
+		return info, nil
+	}
+
+	info, err := fetch()
+	if err != nil {
+		// Leave the cache alone so a transient failure is retried, not pinned.
+		return nil, err
+	}
+	storeGitHubPR(key, info)
+	return info, nil
+}
+
+func lookupGitHubPR(key string) (*GitHubPRInfo, bool) {
+	githubPRMu.Lock()
+	defer githubPRMu.Unlock()
+	entry, ok := githubPRCache[key]
+	if !ok || githubPRNow().Sub(entry.fetchedAt) >= githubPRCacheTTL {
+		return nil, false
+	}
+	return entry.info, true
+}
+
+func storeGitHubPR(key string, info *GitHubPRInfo) {
+	githubPRMu.Lock()
+	defer githubPRMu.Unlock()
+	now := githubPRNow()
+	// Directories and branches come and go; drop what can no longer be served.
+	for cached, entry := range githubPRCache {
+		if now.Sub(entry.fetchedAt) >= githubPRCacheTTL {
+			delete(githubPRCache, cached)
+			delete(githubPRLocks, cached)
+		}
+	}
+	githubPRCache[key] = githubPRCacheEntry{info: info, fetchedAt: now}
+}
+
+func githubPRKeyLock(key string) *sync.Mutex {
+	githubPRMu.Lock()
+	defer githubPRMu.Unlock()
+	lock, ok := githubPRLocks[key]
+	if !ok {
+		lock = &sync.Mutex{}
+		githubPRLocks[key] = lock
+	}
+	return lock
+}
+
+// fetchGitHubPRForBranch asks the gh CLI for the branch's PR. A missing PR is
+// reported as (nil, nil) so it can be cached like any other answer.
+func fetchGitHubPRForBranch(workingDir, branch string) (*GitHubPRInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), githubPRTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "gh", "pr", "view", branch, "--json", "number,title,url,state")
 	cmd.Dir = workingDir
 
 	output, err := cmd.Output()

@@ -19,7 +19,7 @@ jobs:
             target: aarch64-apple-darwin
             go_os: darwin
             go_arch: arm64
-          - platform: macos-13
+          - platform: macos-15-intel
             target: x86_64-apple-darwin
             go_os: darwin
             go_arch: amd64

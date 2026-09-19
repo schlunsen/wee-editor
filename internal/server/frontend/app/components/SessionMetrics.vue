@@ -354,6 +354,10 @@ const hasGitContext = computed(() => !!(props.session?.options?.workspace?.worki
 const workspaceKey = computed(() => [props.session?.id, props.session?.options?.workspace?.working_directory, props.session?.worktree_path, props.session?.options?.working_directory].join('|'))
 let gitRequest = 0
 let gitAbort: AbortController | null = null
+// The panel polls every 5s. Re-assigning gitStatus on an unchanged response
+// replayed the update glow and re-ran the git-remote lookup, so the section
+// appeared to blink continuously. Only react when the payload really changed.
+let gitSignature = ''
 const fetchGitStatus = async () => {
   const sessionId = props.session?.id
   if (!sessionId || !hasGitContext.value) return
@@ -370,11 +374,16 @@ const fetchGitStatus = async () => {
     }
     const data = await response.json()
     if (request !== gitRequest) return
-    gitStatus.value = data
-    gitStatusUpdated.value = !isInitialGitLoad.value
+    const signature = JSON.stringify(data)
+    if (signature !== gitSignature) {
+      gitSignature = signature
+      gitStatus.value = data
+      gitStatusUpdated.value = !isInitialGitLoad.value
+    }
     isInitialGitLoad.value = false
   } catch (err) {
     if (request !== gitRequest) return
+    gitSignature = ''
     gitStatus.value = null
     gitError.value = err instanceof Error ? err.message : 'Failed to fetch git status'
   } finally {
@@ -619,6 +628,7 @@ watch(
 watch(workspaceKey, () => {
   ++gitRequest
   gitAbort?.abort()
+  gitSignature = ''
   gitStatus.value = null
   gitError.value = null
   gitLoading.value = false

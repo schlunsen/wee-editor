@@ -93,3 +93,47 @@ it('ignores late Git responses from the previous workspace and clears stale stat
   wrapper.unmount()
   vi.unstubAllGlobals()
 })
+
+it('stops replaying the update glow and the remote lookup while git status is unchanged', async () => {
+  const { flushPromises } = await import('@vue/test-utils')
+  vi.useFakeTimers()
+  let branch = 'main'
+  let remoteCalls = 0
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url.endsWith('git-remote')) {
+      remoteCalls++
+      return { ok: true, json: async () => ({ html_url: 'https://github.com/o/r' }) }
+    }
+    return { ok: true, json: async () => ({
+      branch, clean: true, staged: [], modified: [], untracked: [], deleted: []
+    }) }
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const session = { id: 'session', status: 'processing', message_count: 1, git_branch: 'main', options: { working_directory: '/repo' } }
+  const wrapper = mount(SessionMetrics, { props: { session }, global: { stubs: { Icon: true, ProjectPermissions: true, ContextUsageBar: true, GitStatus: true } } })
+  try {
+    await flushPromises()
+    const glowing = () => wrapper.find('.git-status-updated').exists()
+    expect(glowing()).toBe(false)
+    expect(remoteCalls).toBe(1)
+
+    // Three polls with an identical working tree must not touch the panel.
+    for (let i = 0; i < 3; i++) {
+      await vi.advanceTimersByTimeAsync(5000)
+      await flushPromises()
+    }
+    expect(glowing()).toBe(false)
+    expect(remoteCalls).toBe(1)
+
+    // A real change still announces itself.
+    branch = 'feature/live'
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+    expect(glowing()).toBe(true)
+    expect(remoteCalls).toBe(2)
+  } finally {
+    wrapper.unmount()
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  }
+})

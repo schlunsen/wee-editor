@@ -18,6 +18,7 @@ import (
 	"github.com/schlunsen/wee-editor/internal/server/terminal"
 	"github.com/schlunsen/wee-editor/internal/sitegenerator"
 	ws "github.com/schlunsen/wee-editor/internal/websocket"
+	"github.com/schlunsen/wee-editor/internal/wtfwyt"
 )
 
 // Server wraps the Fiber app and analytics components.
@@ -33,6 +34,7 @@ type Server struct {
 	wsHub                 *ws.Hub
 	resetTracker          *analytics.ResetTracker
 	modelProviderLookup   *analytics.ModelProviderLookup
+	wtfwytExporter        *wtfwyt.Exporter
 	db                    *database.Database
 	repo                  *database.Repository
 	config                *Config

@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/pterm/pterm"
+
+	"github.com/schlunsen/wee-editor/internal/wtfwyt"
 )
 
 // Config holds the analytics server configuration
@@ -22,6 +24,7 @@ type Config struct {
 	Agent    AgentSettings    `json:"agent"`
 	Terminal TerminalSettings `json:"terminal"`
 	Tunnel   TunnelSettings   `json:"tunnel"`
+	WTFWYT   wtfwyt.Config    `json:"wtfwyt"`
 }
 
 // TunnelSettings holds tunnel (ngrok) configuration

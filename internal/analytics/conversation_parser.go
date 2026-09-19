@@ -46,12 +46,30 @@ type ToolExecution struct {
 	ExecutedAt       time.Time
 }
 
+// ToolExportHook receives every completed tool execution.
+//
+// Defined here, in the consumer, so that analytics does not import the
+// exporter and no dependency cycle exists. internal/wtfwyt implements it.
+type ToolExportHook interface {
+	ExportToolExecution(t *ToolExecution)
+}
+
 // ConversationParser parses Claude Code conversation files for tool usage.
 // It includes memory limits and error handling to process large conversation files safely.
 type ConversationParser struct {
 	repo               *database.Repository
 	maxToolMapSize     int // Maximum number of pending tools to track
 	maxScannerBufferMB int // Maximum scanner buffer size in MB
+
+	// exportHook is optional. When nil - the default - parsing behaves
+	// exactly as before.
+	exportHook ToolExportHook
+}
+
+// SetExportHook installs a hook called for every completed tool execution.
+// Passing nil disables it.
+func (cp *ConversationParser) SetExportHook(h ToolExportHook) {
+	cp.exportHook = h
 }
 
 // NewConversationParser creates a new conversation parser with default limits.
@@ -147,6 +165,18 @@ func (cp *ConversationParser) ParseConversationFile(filePath string) error {
 						if err := cp.recordToolExecution(tool); err != nil {
 							// Log error but continue processing
 							fmt.Printf("Warning: failed to record tool execution: %v\n", err)
+						}
+
+						// Export for credential scanning. Every completed
+						// tool execution passes through here, which makes it
+						// the one place worth hooking: tool results are where
+						// secrets actually surface (`cat .env` and friends).
+						//
+						// The hook scans locally and transmits only findings;
+						// it never mutates the execution, whose data stays on
+						// this machine either way.
+						if cp.exportHook != nil {
+							cp.exportHook.ExportToolExecution(tool)
 						}
 
 						// Remove from map to free memory

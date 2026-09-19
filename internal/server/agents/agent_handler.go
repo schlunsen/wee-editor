@@ -158,6 +158,41 @@ func (h *AgentHandler) broadcastBackgroundAgentUpdate(sessionID uuid.UUID, msg i
 	}
 }
 
+// BroadcastGlobal sends a message to every connected agent WebSocket client,
+// regardless of session.
+//
+// Every other broadcast here is session-scoped, which is right for session
+// activity. A credential exposure alert is not session activity: it is a
+// security event about the machine, it originates from the conversation
+// parser rather than from an agent session, and whoever is looking at the UI
+// needs to see it whatever page they happen to be on.
+//
+// A connection can appear under more than one session, so writes are
+// deduplicated to avoid sending the same alert twice down one socket.
+func (h *AgentHandler) BroadcastGlobal(msg interface{}) {
+	h.sessionConnectionsMu.RLock()
+	seen := make(map[*fiberws.Conn]struct{})
+	targets := make([]*fiberws.Conn, 0, len(h.sessionConnections))
+	for _, conns := range h.sessionConnections {
+		for _, c := range conns {
+			if _, dup := seen[c]; dup {
+				continue
+			}
+			seen[c] = struct{}{}
+			targets = append(targets, c)
+		}
+	}
+	h.sessionConnectionsMu.RUnlock()
+
+	for _, conn := range targets {
+		go func(c *fiberws.Conn) {
+			if err := h.safeWriteJSON(c, msg); err != nil {
+				log.Printf("Failed to broadcast global message: %v", err)
+			}
+		}(conn)
+	}
+}
+
 // SetAnalyticsHub sets the analytics WebSocket hub for broadcasting tool use events
 func (h *AgentHandler) SetAnalyticsHub(hub AnalyticsHub) {
 	h.analyticsHub = hub

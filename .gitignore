@@ -105,6 +105,7 @@ docker-compose.zap-scan.yml
 *.db-wal
 .mcp.json.old
 .mcp-metadata.json
-models/
+# ML model weights at repo root only (an unanchored rule hid ios/wee/wee/Models/)
+/models/
 .gstack/
 wee.cat

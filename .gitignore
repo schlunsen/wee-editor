@@ -86,12 +86,9 @@ south_park/
 TODOWRITE_IMPLEMENTATION_COMPLETE.md
 settings.local.json
 
-# Built binaries
-wee.cat
-wee-*
-!wee-*.service
-!docs/wee-*.png
-!internal/server/frontend/public/wee-cat-terminal-logo.*
+# Built binaries (repo root only; an unanchored rule hid website/public/images/wee-*.png)
+/wee.cat
+/wee-*
 /cct
 /cct-*
 

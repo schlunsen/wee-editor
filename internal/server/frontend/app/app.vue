@@ -8,6 +8,7 @@ import { useKeyboardShortcuts } from '~/composables/useKeyboardShortcuts'
 import { useAuth } from '~/composables/useAuth'
 import { useTheme } from '~/composables/useTheme'
 import { useSettingsStore } from '~/stores/settings/settingsStore'
+import SecretFindingAlerts from '~/components/security/SecretFindingAlerts.vue'
 
 // Initialize theme system
 const { isDark } = useTheme()
@@ -107,6 +108,9 @@ watch(authUser, (newUser) => {
     <ProjectSelectorModal
       v-model="showProjectSelector"
     />
+
+    <!-- Leaked credential alerts (global, any page) -->
+    <SecretFindingAlerts />
   </div>
 </template>
 

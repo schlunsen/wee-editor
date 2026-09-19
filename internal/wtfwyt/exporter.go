@@ -15,10 +15,21 @@ import (
 	"github.com/schlunsen/wtfwyt/server/pkg/wire"
 )
 
+// AlertContext describes where a credential surfaced.
+//
+// Carried as a struct rather than a formatted string so the UI receives
+// structured fields and does not have to parse prose back apart.
+type AlertContext struct {
+	Source    string // user_message, assistant_message, tool_result, tool_input
+	ToolName  string // the tool that produced it, when applicable
+	FilePath  string // the file it was read from, when known
+	SessionID string
+}
+
 // AlertFunc is called when a credential is detected locally, before anything
 // is transmitted. It is how the user finds out immediately rather than when
 // someone next opens a dashboard.
-type AlertFunc func(finding detect.Finding, where string)
+type AlertFunc func(finding detect.Finding, ctx AlertContext)
 
 // Exporter batches session events and ships them to a wtfwyt server.
 //

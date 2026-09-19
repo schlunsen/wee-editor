@@ -171,11 +171,12 @@ func (e *Exporter) reportFinding(f detect.Finding, sessionID string, ts time.Tim
 	e.mu.Unlock()
 
 	if alert != nil && (e.cfg.AlertOnCritical || f.Severity != detect.SeverityCritical) {
-		where := string(source)
-		if tool != "" {
-			where += " (" + tool + ")"
-		}
-		alert(f, where)
+		alert(f, AlertContext{
+			Source:    string(source),
+			ToolName:  tool,
+			FilePath:  file,
+			SessionID: sessionID,
+		})
 	}
 
 	wf := wire.FindingFromDetect(f, source)

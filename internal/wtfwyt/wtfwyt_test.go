@@ -248,9 +248,11 @@ func TestLocalAlertFires(t *testing.T) {
 
 	var mu sync.Mutex
 	var alerts []detect.Finding
-	e.SetAlert(func(f detect.Finding, where string) {
+	var contexts []AlertContext
+	e.SetAlert(func(f detect.Finding, actx AlertContext) {
 		mu.Lock()
 		alerts = append(alerts, f)
+		contexts = append(contexts, actx)
 		mu.Unlock()
 	})
 
@@ -267,6 +269,17 @@ func TestLocalAlertFires(t *testing.T) {
 	}
 	if alerts[0].Severity != detect.SeverityCritical {
 		t.Errorf("severity = %s", alerts[0].Severity)
+	}
+	// The context the web UI renders from must be populated, not a
+	// pre-formatted string the frontend would have to parse apart.
+	if contexts[0].Source != "tool_result" {
+		t.Errorf("source = %q, want tool_result", contexts[0].Source)
+	}
+	if contexts[0].ToolName != "Bash" {
+		t.Errorf("tool = %q, want Bash", contexts[0].ToolName)
+	}
+	if contexts[0].SessionID != "s" {
+		t.Errorf("session = %q, want s", contexts[0].SessionID)
 	}
 }
 

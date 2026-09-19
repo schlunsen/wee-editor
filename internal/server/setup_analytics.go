@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/pterm/pterm"
 
 	"github.com/schlunsen/wee-editor/internal/analytics"
@@ -45,9 +47,46 @@ func (s *Server) setupWTFWYTExport() {
 		return
 	}
 
-	// Surface a detection immediately, in the terminal. Whoever just pasted a
-	// live credential needs to know now - not when someone opens a dashboard.
-	exporter.SetAlert(func(f detect.Finding, where string) {
+	// Surface a detection immediately.
+	//
+	// wee runs primarily as a web app, so the browser is the only place an
+	// alert is actually seen - a terminal line scrolls past unread in a window
+	// nobody is looking at.
+	//
+	// This goes out on the AGENT websocket (/agent/ws), not the general hub.
+	// The general hub wraps payloads as {"event":...,"data":...}, and nothing
+	// in the frontend reads that envelope; the agent socket delivers
+	// {"type":...} messages, which is what useAgentWebSocket dispatches on.
+	// Sending to the wrong one would have been silently invisible.
+	//
+	// The terminal line stays as a fallback for headless runs.
+	exporter.SetAlert(func(f detect.Finding, actx wtfwyt.AlertContext) {
+		if s.agentHandler != nil {
+			// Only the masked hint and the fingerprint travel. The credential
+			// is never put on the wire, including to the local browser.
+			s.agentHandler.BroadcastGlobal(fiber.Map{
+				"type":        "secret_finding",
+				"severity":    string(f.Severity),
+				"rule_name":   f.Name,
+				"rule_id":     f.RuleID,
+				"hint":        f.Hint,
+				"fingerprint": f.Fingerprint,
+				"source":      actx.Source,
+				"tool_name":   actx.ToolName,
+				"file_path":   actx.FilePath,
+				"session_id":  actx.SessionID,
+				"redacted":    true,
+				"detected_at": time.Now().UTC().Format(time.RFC3339),
+			})
+		}
+
+		if s.quiet {
+			return
+		}
+		where := actx.Source
+		if actx.ToolName != "" {
+			where += " (" + actx.ToolName + ")"
+		}
 		if f.Severity == detect.SeverityCritical {
 			pterm.Error.Printfln("credential exposed: %s (%s) in %s - rotate it", f.Name, f.Hint, where)
 			return

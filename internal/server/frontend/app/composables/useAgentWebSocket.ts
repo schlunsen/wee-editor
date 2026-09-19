@@ -29,6 +29,7 @@ interface AgentWebSocketCallbacks {
   onSubagentMessage: ((data: any) => void) | null
   onAutoHandoff: ((data: any) => void) | null
   onLoopUpdate: ((data: any) => void) | null
+  onSecretFinding: ((data: any) => void) | null
   onError: ((data: any) => void) | null
   onReconnect: ((data: any) => void) | null
 }
@@ -72,6 +73,7 @@ export const useAgentWebSocket = () => {
     onSubagentMessage: null,
     onAutoHandoff: null,
     onLoopUpdate: null,
+    onSecretFinding: null,
     onError: null,
     onReconnect: null,
   })
@@ -347,6 +349,21 @@ export const useAgentWebSocket = () => {
             case 'loop_failed':
             case 'loop_stopped':
               callbacks.onLoopUpdate?.(message)
+              break
+
+            case 'secret_finding':
+              // Credential leaked into the transcript - route to Pinia store so the
+              // global alert surfaces it regardless of which page is open
+              try {
+                const { useSecretFindingsStore } = await import('~/stores/security/secretFindingsStore')
+                const secretFindingsStore = useSecretFindingsStore()
+                secretFindingsStore.addFinding(message)
+              } catch (e) {
+                console.warn('Failed to record secret finding:', e)
+              }
+
+              // Also call any registered callbacks
+              callbacks.onSecretFinding?.(message)
               break
 
             case 'error':

@@ -3,7 +3,6 @@ module github.com/schlunsen/wee-editor
 go 1.25.0
 
 require (
-	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.25.0
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/creack/pty v1.1.24
@@ -32,7 +31,6 @@ require (
 	atomicgo.dev/keyboard v0.2.9 // indirect
 	atomicgo.dev/schedule v0.1.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
-	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/containerd/console v1.0.5 // indirect
@@ -62,6 +60,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/savsgio/gotils v0.0.0-20230208104028-c358bd845dee // indirect
+	github.com/schlunsen/wtfwyt/server v0.0.0
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/tinylib/msgp v1.2.5 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
@@ -76,3 +75,9 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+// TODO(wtfwyt): replace with a normal require once the shared protocol module
+// is published. wee-editor is public and schlunsen/wtfwyt is private, so this
+// cannot be fetched by CI or by outside contributors as things stand.
+// See the PR description for the options.
+replace github.com/schlunsen/wtfwyt/server => ../../../wtfwyt/server
